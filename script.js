@@ -1,5 +1,5 @@
 const API_BASE = ""; // 同源，不要写域名
-let AUTH_TOKEN = localStorage.getItem("AUTH_TOKEN") || ""; // 令牌不写死仓库
+let AUTH_TOKEN = localStorage.getItem("AUTH_TOKEN") || "";
 
 // 简易本地存储封装
 const storage = {
@@ -12,10 +12,6 @@ const storage = {
 // 配置管理
 const CONFIG_KEY = 'prenatal_config';
 const HISTORY_KEY = 'prenatal_history';
-
-// API配置
-const API_BASE = "https://prenatal-backend-xxx.vercel.app"; // 替换为你的Vercel域名
-let AUTH_TOKEN = "your-auth-token-placeholder"; // 占位符，需要替换为实际令牌
 
 // 动态设置访问令牌
 function setAuthToken(token) {
