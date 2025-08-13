@@ -25,25 +25,14 @@ class APIHandler(SimpleHTTPRequestHandler):
         parsed_path = urlparse(self.path)
         
         if parsed_path.path == '/api/ark':
-            # 导入并使用ark.py中的handler
+            print('[SERVER] Routing to /api/ark')
+            # 直接调用 ark.py 中 handler 的 do_POST，传入当前 self，避免重复实例化 BaseHTTPRequestHandler
             try:
                 spec = importlib.util.spec_from_file_location("ark", "api/ark.py")
                 ark_module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(ark_module)
-                
-                # 直接调用handler类的do_POST方法
-                handler_instance = ark_module.handler(self.request, self.client_address, self.server)
-                # 复制当前请求的所有属性
-                handler_instance.rfile = self.rfile
-                handler_instance.wfile = self.wfile
-                handler_instance.headers = self.headers
-                handler_instance.path = self.path
-                handler_instance.command = self.command
-                handler_instance.request_version = self.request_version
-                handler_instance.requestline = getattr(self, 'requestline', f'{self.command} {self.path} {self.request_version}')
-                handler_instance.client_address = self.client_address
-                handler_instance.server = self.server
-                handler_instance.do_POST()
+                # 调用未绑定方法，复用当前请求上下文
+                ark_module.handler.do_POST(self)
                 return
             except Exception as e:
                 print(f"Error handling /api/ark: {e}")
@@ -62,25 +51,12 @@ class APIHandler(SimpleHTTPRequestHandler):
                 return
                 
         elif parsed_path.path == '/api/tts':
-            # 导入并使用tts.py中的handler
+            # 直接调用 tts.py 中 handler 的 do_POST，传入当前 self
             try:
                 spec = importlib.util.spec_from_file_location("tts", "api/tts.py")
                 tts_module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(tts_module)
-                
-                # 直接调用handler类的do_POST方法
-                handler_instance = tts_module.handler(self.request, self.client_address, self.server)
-                # 复制当前请求的所有属性
-                handler_instance.rfile = self.rfile
-                handler_instance.wfile = self.wfile
-                handler_instance.headers = self.headers
-                handler_instance.path = self.path
-                handler_instance.command = self.command
-                handler_instance.request_version = self.request_version
-                handler_instance.requestline = getattr(self, 'requestline', f'{self.command} {self.path} {self.request_version}')
-                handler_instance.client_address = self.client_address
-                handler_instance.server = self.server
-                handler_instance.do_POST()
+                tts_module.handler.do_POST(self)
                 return
             except Exception as e:
                 print(f"Error handling /api/tts: {e}")
@@ -104,6 +80,7 @@ class APIHandler(SimpleHTTPRequestHandler):
         parsed_path = urlparse(self.path)
         
         if parsed_path.path.startswith('/api/'):
+            print(f"[SERVER] GET {parsed_path.path} -> 405")
             # API端点不支持GET请求
             self.send_response(405)
             self.send_header('Content-Type', 'application/json')
@@ -127,35 +104,14 @@ class APIHandler(SimpleHTTPRequestHandler):
                     spec = importlib.util.spec_from_file_location("ark", "api/ark.py")
                     ark_module = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(ark_module)
-                    
-                    handler_instance = ark_module.handler(self.request, self.client_address, self.server)
-                    handler_instance.rfile = self.rfile
-                    handler_instance.wfile = self.wfile
-                    handler_instance.headers = self.headers
-                    handler_instance.path = self.path
-                    handler_instance.command = self.command
-                    handler_instance.request_version = self.request_version
-                    handler_instance.requestline = getattr(self, 'requestline', f'{self.command} {self.path} {self.request_version}')
-                    handler_instance.client_address = self.client_address
-                    handler_instance.server = self.server
-                    handler_instance.do_OPTIONS()
+                    # 直接调用模块中的 do_OPTIONS，复用当前 self
+                    ark_module.handler.do_OPTIONS(self)
                     return
                 elif parsed_path.path == '/api/tts':
                     spec = importlib.util.spec_from_file_location("tts", "api/tts.py")
                     tts_module = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(tts_module)
-                    
-                    handler_instance = tts_module.handler(self.request, self.client_address, self.server)
-                    handler_instance.rfile = self.rfile
-                    handler_instance.wfile = self.wfile
-                    handler_instance.headers = self.headers
-                    handler_instance.path = self.path
-                    handler_instance.command = self.command
-                    handler_instance.request_version = self.request_version
-                    handler_instance.requestline = getattr(self, 'requestline', f'{self.command} {self.path} {self.request_version}')
-                    handler_instance.client_address = self.client_address
-                    handler_instance.server = self.server
-                    handler_instance.do_OPTIONS()
+                    tts_module.handler.do_OPTIONS(self)
                     return
             except Exception as e:
                 print(f"Error handling OPTIONS: {e}")
