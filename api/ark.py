@@ -188,7 +188,8 @@ class handler(BaseHTTPRequestHandler):
                     for key, value in cors_headers.items():
                         self.send_header(key, value)
                     self.end_headers()
-                    self.wfile.write(json.dumps({"error": err_body.decode("utf-8")}, ensure_ascii=False).encode('utf-8'))
+                    error_msg = err_body.decode("utf-8")
+                    self.wfile.write(json.dumps({"error": error_msg}, ensure_ascii=False).encode('utf-8'))
         except Exception as e:
             try:
                 cors_headers = _get_cors_headers()
