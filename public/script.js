@@ -278,15 +278,30 @@ el.generateAudio.addEventListener('click', async () => {
       frontend_type: "unitTson"
     };
     const data = await ttsSynthesize(payload);
-    if (!data || !data.data || !data.data.audio) {
-      throw new Error('TTS返回格式异常');
+    
+    // 根据火山引擎TTS文档，音频数据位于 data 字段中，且已经是base64编码
+    let audioBase64;
+    if (data.data && typeof data.data === 'string') {
+      // 直接的base64字符串
+      audioBase64 = data.data;
+    } else if (data.data && data.data.audio) {
+      // 嵌套在data.audio中
+      audioBase64 = data.data.audio;
+    } else if (data.audio) {
+      // 直接在audio字段中
+      audioBase64 = data.audio;
+    } else {
+      throw new Error('TTS返回格式异常：未找到音频数据');
     }
-    const audioBytes = base64ToBytes(data.data.audio);
+    
+    const audioBytes = base64ToBytes(audioBase64);
     const blob = new Blob([audioBytes], { type: 'audio/mpeg' });
     state.lastAudioBlob = blob;
     const url = URL.createObjectURL(blob);
     el.audioElement.src = url;
     el.audioPlayer.style.display = 'flex';
+    
+    showSuccess('语音生成成功！');
   } catch (e) {
     console.error(e);
     alert('生成语音失败：' + (e.message || '请稍后重试'));
@@ -385,9 +400,42 @@ function renderHistory() {
         <span class="time">${new Date(item.time).toLocaleString()}</span>
       </div>
       <div class="history-text">${escapeHtml(item.text)}</div>
+      <div class="history-actions">
+        <button class="btn btn-secondary btn-sm reload-text" data-text="${escapeHtml(item.text)}">
+          <span class="btn-text">载入文本</span>
+        </button>
+        <button class="btn btn-primary btn-sm generate-audio" data-text="${escapeHtml(item.text)}">
+          <span class="btn-text">生成语音</span>
+          <span class="loading-spinner" style="display: none;">⏳</span>
+        </button>
+      </div>
     `;
     el.historyList.appendChild(div);
   }
+  
+  // 为历史记录按钮添加事件监听器
+  el.historyList.querySelectorAll('.reload-text').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const text = btn.getAttribute('data-text');
+      state.lastContent = text;
+      el.contentText.textContent = text;
+      el.resultSection.style.display = 'block';
+      el.audioPlayer.style.display = 'none';
+      showSuccess('文本已载入，可以直接生成语音');
+    });
+  });
+  
+  el.historyList.querySelectorAll('.generate-audio').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const text = btn.getAttribute('data-text');
+      setLoading(btn, true);
+      try {
+        await generateAudioForHistoryItem(text);
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+  });
 }
 
 function escapeHtml(str) {
@@ -475,3 +523,64 @@ function base64ToBytes(base64) {
 }
 
 init();
+
+
+
+// 为历史记录项生成语音
+async function generateAudioForHistoryItem(text) {
+  if (!state.ttsAppId || !state.accessToken) {
+    alert('请先在配置区域保存TTS设置');
+    return;
+  }
+  
+  try {
+    const payload = {
+      text: text,
+      appid: state.ttsAppId,
+      access_token: state.accessToken,
+      voice_type: state.voiceType || 'BV421_streaming',
+      encoding: "mp3",
+      speed_ratio: 1.0,
+      volume_ratio: 1.0,
+      pitch_ratio: 1.0,
+      uid: "test_user_001",
+      cluster: "volcano_tts",
+      reqid: Date.now().toString(),
+      text_type: "plain",
+      operation: "query",
+      with_frontend: 1,
+      frontend_type: "unitTson"
+    };
+    
+    const data = await ttsSynthesize(payload);
+    
+    // 根据火山引擎TTS文档，音频数据位于 data 字段中
+    let audioBase64;
+    if (data.data && typeof data.data === 'string') {
+      audioBase64 = data.data;
+    } else if (data.data && data.data.audio) {
+      audioBase64 = data.data.audio;
+    } else if (data.audio) {
+      audioBase64 = data.audio;
+    } else {
+      throw new Error('TTS返回格式异常：未找到音频数据');
+    }
+    
+    const audioBytes = base64ToBytes(audioBase64);
+    const blob = new Blob([audioBytes], { type: 'audio/mpeg' });
+    state.lastAudioBlob = blob;
+    const url = URL.createObjectURL(blob);
+    el.audioElement.src = url;
+    el.audioPlayer.style.display = 'flex';
+    
+    // 将历史记录的文本设置为当前内容
+    state.lastContent = text;
+    el.contentText.textContent = text;
+    el.resultSection.style.display = 'block';
+    
+    showSuccess('历史记录语音生成成功！');
+  } catch (e) {
+    console.error(e);
+    alert('生成语音失败：' + (e.message || '请稍后重试'));
+  }
+}
