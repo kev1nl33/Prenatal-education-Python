@@ -1,3 +1,6 @@
+const API_BASE = ""; // 同源，不要写域名
+let AUTH_TOKEN = localStorage.getItem("AUTH_TOKEN") || ""; // 令牌不写死仓库
+
 // 简易本地存储封装
 const storage = {
   get(key, def) {
