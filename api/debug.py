@@ -18,13 +18,19 @@ class handler(BaseHTTPRequestHandler):
             else:
                 key_status = 'EMPTY'
             
+            force_test_mode = os.environ.get('FORCE_TEST_MODE', 'true').lower() == 'true'
+            test_mode_by_key = ark_api_key in [None, '', 'your_ark_api_key_here', 'sk-your-real-api-key-here'] or not ark_api_key
+            
             debug_info = {
                 'ark_api_key_status': key_status,
-                'test_mode_enabled': ark_api_key in [None, '', 'your_ark_api_key_here', 'sk-your-real-api-key-here'] or not ark_api_key,
+                'force_test_mode': force_test_mode,
+                'test_mode_by_key': test_mode_by_key,
+                'test_mode_enabled': force_test_mode or test_mode_by_key,
                 'environment_vars': {
                     'VERCEL': os.environ.get('VERCEL', 'NOT_SET'),
                     'VERCEL_ENV': os.environ.get('VERCEL_ENV', 'NOT_SET'),
-                    'NODE_ENV': os.environ.get('NODE_ENV', 'NOT_SET')
+                    'NODE_ENV': os.environ.get('NODE_ENV', 'NOT_SET'),
+                    'FORCE_TEST_MODE': os.environ.get('FORCE_TEST_MODE', 'NOT_SET')
                 }
             }
             

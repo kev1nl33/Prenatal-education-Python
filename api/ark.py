@@ -69,7 +69,9 @@ class handler(BaseHTTPRequestHandler):
             
             # 获取环境变量中的API密钥
             ark_api_key = os.environ.get('ARK_API_KEY')
-            if not ark_api_key or ark_api_key in ['your_ark_api_key_here', 'sk-your-real-api-key-here']:
+            force_test_mode = os.environ.get('FORCE_TEST_MODE', 'true').lower() == 'true'
+            
+            if force_test_mode or not ark_api_key or ark_api_key in ['your_ark_api_key_here', 'sk-your-real-api-key-here']:
                 # 测试模式：返回快速模拟响应
                 prompt = data.get("prompt", "")
                 story_content = f"亲爱的宝宝，这是为你准备的胎教故事：{prompt[:50]}...在一个温暖的春天，小动物们在森林里快乐地生活着。它们互相帮助，分享快乐，就像妈妈对你的爱一样温暖。"
