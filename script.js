@@ -9,8 +9,7 @@ const storage = {
   set(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 };
 
-// 配置管理
-const CONFIG_KEY = 'prenatal_config';
+// 历史记录管理
 const HISTORY_KEY = 'prenatal_history';
 
 // 动态设置访问令牌
@@ -18,21 +17,7 @@ function setAuthToken(token) {
     AUTH_TOKEN = token;
 }
 
-// 检测是否为本地开发环境
-function isLocalDev() {
-    return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-}
 
-// 获取API基地址（保留兼容性）
-function getApiBase() {
-    // 默认使用同源地址，适配Vercel和线上环境
-    // 仅当本地且手动开启use_local_proxy开关时，才通过localhost:8012代理
-    const use_local_proxy = false; // 手动开关，本地开发时可设为true
-    if (isLocalDev() && use_local_proxy) {
-        return 'http://localhost:8012';
-    }
-    return ''; // 空字符串表示使用同源地址
-}
 
 // 显示错误提示
 function showError(message) {
@@ -205,10 +190,12 @@ el.generateContent.addEventListener('click', async () => {
     alert('请先在上方保存文本大模型API Key');
     return;
   }
-  const payload = buildPrompt();
+  const prompt = buildPrompt();
   setLoading(el.generateContent, true);
   try {
-    const text = await callVolcTextAPI(payload, state.textApiKey, state.modelEndpoint);
+    const model = (state.modelEndpoint && state.modelEndpoint.trim()) ? state.modelEndpoint.trim() : 'doubao-1.5-pro-32k-250115';
+    const data = await arkGenerate(prompt, model);
+    const text = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : '';
     state.lastContent = text;
     el.contentText.textContent = text;
     el.resultSection.style.display = 'block';
@@ -240,7 +227,28 @@ el.generateAudio.addEventListener('click', async () => {
   }
   setLoading(el.generateAudio, true);
   try {
-    const { blob } = await callVolcTTS(state.lastContent, state.ttsAppId, state.accessToken, state.voiceType || 'BV421_streaming');
+    const payload = {
+      text: state.lastContent,
+      appid: state.ttsAppId,
+      voice_type: state.voiceType || 'BV421_streaming',
+      encoding: "mp3",
+      speed_ratio: 1.0,
+      volume_ratio: 1.0,
+      pitch_ratio: 1.0,
+      uid: "test_user_001",
+      cluster: "volcano_tts",
+      reqid: Date.now().toString(),
+      text_type: "plain",
+      operation: "query",
+      with_frontend: 1,
+      frontend_type: "unitTson"
+    };
+    const data = await ttsSynthesize(payload);
+    if (!data || !data.data || !data.data.audio) {
+      throw new Error('TTS返回格式异常');
+    }
+    const audioBytes = base64ToBytes(data.data.audio);
+    const blob = new Blob([audioBytes], { type: 'audio/mpeg' });
     state.lastAudioBlob = blob;
     const url = URL.createObjectURL(blob);
     el.audioElement.src = url;
@@ -292,57 +300,9 @@ function buildPrompt() {
   return `请以温柔、积极、安定的语气，面向孕妈妈，生成${typeMap[type]}。整体基调为“${moodMap[mood]}”，篇幅${durationMap[duration]}。要求：\n- 用词轻柔、避免刺激、避免负面暗示\n- 建议分为自然小段，便于朗读\n- 适当加入呼吸/放松/想象引导\n- 面向中文语境读者，使用简体中文`;
 }
 
-// 调用火山引擎文本生成API (Ark Chat Completions)
-async function callVolcTextAPI(prompt, apiKey, endpointId) {
-  const model = (endpointId && endpointId.trim()) ? endpointId.trim() : 'doubao-1.5-pro-32k-250115';
-  
-  try {
-    const data = await arkGenerate(prompt, model);
-    if (data.choices && data.choices[0] && data.choices[0].message) {
-      return data.choices[0].message.content;
-    } else {
-      throw new Error('API返回格式异常');
-    }
-  } catch (error) {
-    console.error('调用文本API失败:', error);
-    throw error; // 错误已在arkGenerate中处理和显示
-  }
-}
 
-// 调用火山引擎TTS语音合成API  
-async function callVolcTTS(text, apiKey, accessToken, voiceType = 'BV421_streaming') {
-    try {
-        const payload = {
-            text: text,
-            appid: apiKey,
-            voice_type: voiceType,
-            encoding: "mp3",
-            speed_ratio: 1.0,
-            volume_ratio: 1.0,
-            pitch_ratio: 1.0,
-            uid: "test_user_001",
-            cluster: "volcano_tts",
-            reqid: Date.now().toString(),
-            text_type: "plain",
-            operation: "query",
-            with_frontend: 1,
-            frontend_type: "unitTson"
-        };
-        
-        const data = await ttsSynthesize(payload);
-        if (!data || !data.data || !data.data.audio) {
-            throw new Error('TTS返回格式异常');
-        }
 
-        // data.data.audio is base64 mp3
-        const audioBytes = base64ToBytes(data.data.audio);
-        const blob = new Blob([audioBytes], { type: 'audio/mpeg' });
-        return { blob };
-    } catch (e) {
-        console.error(e);
-        throw e; // 错误已在ttsSynthesize中处理和显示
-    }
-}
+
 
 function setLoading(button, loading) {
   const text = button.querySelector('.btn-text');
