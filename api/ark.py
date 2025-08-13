@@ -117,11 +117,11 @@ class handler(BaseHTTPRequestHandler):
                 }
             )
             
-            # 发送请求
+            # 发送请求 - 减少超时时间以适应 Vercel 限制
             ctx = _build_ssl_ctx()
             try:
                 if ctx is not None:
-                    with urllib.request.urlopen(req, timeout=30, context=ctx) as response:
+                    with urllib.request.urlopen(req, timeout=8, context=ctx) as response:
                         response_data = response.read()
                         # 解析火山方舟API的响应并返回JSON格式
                         try:
@@ -163,7 +163,7 @@ class handler(BaseHTTPRequestHandler):
                             self.end_headers()
                             self.wfile.write(json.dumps(wrapped_response, ensure_ascii=False).encode('utf-8'))
                 else:
-                    with urllib.request.urlopen(req, timeout=30) as response:
+                    with urllib.request.urlopen(req, timeout=8) as response:
                         response_data = response.read()
                         self.send_response(200)
                         for key, value in cors_headers.items():
