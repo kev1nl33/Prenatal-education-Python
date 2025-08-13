@@ -2,6 +2,7 @@ import json
 import os
 import ssl
 import urllib.request
+import base64
 from urllib.error import HTTPError
 from urllib.parse import parse_qs
 from http.server import BaseHTTPRequestHandler
@@ -177,11 +178,10 @@ class handler(BaseHTTPRequestHandler):
                             self.end_headers()
                             self.wfile.write(json.dumps(tts_response, ensure_ascii=False).encode('utf-8'))
                         except json.JSONDecodeError:
-                            # 如果响应不是JSON格式，包装成标准格式
+                            # 如果响应不是JSON格式，说明是音频二进制数据，需要base64编码
+                            audio_base64 = base64.b64encode(response_data).decode('utf-8')
                             wrapped_response = {
-                                "data": {
-                                    "audio": response_data.decode("utf-8")
-                                }
+                                "data": audio_base64
                             }
                             self.send_response(200)
                             for key, value in cors_headers.items():
@@ -191,11 +191,25 @@ class handler(BaseHTTPRequestHandler):
                 else:
                     with urllib.request.urlopen(req, timeout=30) as response:
                         response_data = response.read()
-                        self.send_response(200)
-                        for key, value in cors_headers.items():
-                            self.send_header(key, value)
-                        self.end_headers()
-                        self.wfile.write(response_data)
+                        # 不使用SSL时也要正确处理响应
+                        try:
+                            tts_response = json.loads(response_data.decode("utf-8"))
+                            self.send_response(200)
+                            for key, value in cors_headers.items():
+                                self.send_header(key, value)
+                            self.end_headers()
+                            self.wfile.write(json.dumps(tts_response, ensure_ascii=False).encode('utf-8'))
+                        except json.JSONDecodeError:
+                            # 如果响应不是JSON格式，说明是音频二进制数据，需要base64编码
+                            audio_base64 = base64.b64encode(response_data).decode('utf-8')
+                            wrapped_response = {
+                                "data": audio_base64
+                            }
+                            self.send_response(200)
+                            for key, value in cors_headers.items():
+                                self.send_header(key, value)
+                            self.end_headers()
+                            self.wfile.write(json.dumps(wrapped_response, ensure_ascii=False).encode('utf-8'))
             except HTTPError as e:
                 err_body = e.read()
                 # 尝试解析错误响应为JSON，如果失败则包装为标准错误格式
