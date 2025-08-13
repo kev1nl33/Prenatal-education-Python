@@ -61,6 +61,12 @@ class handler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": "Unauthorized"}, ensure_ascii=False).encode('utf-8'))
                 return
             
+            # 解析请求体
+            content_length = int(self.headers.get('Content-Length', 0))
+            raw_data = self.rfile.read(content_length)
+            raw = raw_data.decode("utf-8") if raw_data else ""
+            data = json.loads(raw) if raw else {}
+            
             # 获取环境变量中的API密钥
             ark_api_key = os.environ.get('ARK_API_KEY')
             if not ark_api_key or ark_api_key in ['your_ark_api_key_here', 'sk-your-real-api-key-here']:
@@ -81,12 +87,6 @@ class handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps(mock_response, ensure_ascii=False).encode('utf-8'))
                 return
-            
-            # 解析请求体
-            content_length = int(self.headers.get('Content-Length', 0))
-            raw_data = self.rfile.read(content_length)
-            raw = raw_data.decode("utf-8") if raw_data else ""
-            data = json.loads(raw) if raw else {}
             
             prompt = data.get("prompt", "")
             model = data.get("model") or os.environ.get('ARK_MODEL', 'kimi-k2-250711')
