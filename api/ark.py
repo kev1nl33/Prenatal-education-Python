@@ -165,11 +165,45 @@ class handler(BaseHTTPRequestHandler):
                 else:
                     with urllib.request.urlopen(req, timeout=8) as response:
                         response_data = response.read()
-                        self.send_response(200)
-                        for key, value in cors_headers.items():
-                            self.send_header(key, value)
-                        self.end_headers()
-                        self.wfile.write(response_data)
+                        # 解析火山方舟API的响应并返回JSON格式
+                        try:
+                            ark_response = json.loads(response_data.decode("utf-8"))
+                            # 验证响应格式是否符合预期
+                            if 'choices' in ark_response and len(ark_response['choices']) > 0:
+                                # 标准的OpenAI格式响应，直接返回
+                                self.send_response(200)
+                                for key, value in cors_headers.items():
+                                    self.send_header(key, value)
+                                self.end_headers()
+                                self.wfile.write(json.dumps(ark_response, ensure_ascii=False).encode('utf-8'))
+                            else:
+                                # 如果响应格式不符合预期，包装成标准格式
+                                wrapped_response = {
+                                    "choices": [{
+                                        "message": {
+                                            "content": str(ark_response)
+                                        }
+                                    }]
+                                }
+                                self.send_response(200)
+                                for key, value in cors_headers.items():
+                                    self.send_header(key, value)
+                                self.end_headers()
+                                self.wfile.write(json.dumps(wrapped_response, ensure_ascii=False).encode('utf-8'))
+                        except json.JSONDecodeError:
+                            # 如果响应不是JSON格式，包装成标准格式
+                            wrapped_response = {
+                                "choices": [{
+                                    "message": {
+                                        "content": response_data.decode("utf-8")
+                                    }
+                                }]
+                            }
+                            self.send_response(200)
+                            for key, value in cors_headers.items():
+                                self.send_header(key, value)
+                            self.end_headers()
+                            self.wfile.write(json.dumps(wrapped_response, ensure_ascii=False).encode('utf-8'))
             except HTTPError as e:
                 err_body = e.read()
                 # 尝试解析错误响应为JSON，如果失败则包装为标准错误格式
