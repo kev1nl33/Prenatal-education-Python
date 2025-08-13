@@ -35,6 +35,25 @@ def _verify_auth(headers):
 
 
 class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        try:
+            cors_headers = _get_cors_headers()
+            self.send_response(200)
+            for key, value in cors_headers.items():
+                self.send_header(key, value)
+            self.end_headers()
+            response = {
+                "message": "ARK API is running",
+                "methods": ["POST"],
+                "description": "Send POST request with 'prompt' parameter to generate content"
+            }
+            self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
+        except Exception as e:
+            self.send_response(500)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": str(e)}, ensure_ascii=False).encode('utf-8'))
+    
     def do_OPTIONS(self):
         try:
             cors_headers = _get_cors_headers()
