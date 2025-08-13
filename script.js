@@ -6,6 +6,137 @@ const storage = {
   set(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 };
 
+// 配置管理
+const CONFIG_KEY = 'prenatal_config';
+const HISTORY_KEY = 'prenatal_history';
+
+// API配置
+const API_BASE = "https://prenatal-backend-xxx.vercel.app"; // 替换为你的Vercel域名
+let AUTH_TOKEN = "your-auth-token-placeholder"; // 占位符，需要替换为实际令牌
+
+// 动态设置访问令牌
+function setAuthToken(token) {
+    AUTH_TOKEN = token;
+}
+
+// 检测是否为本地开发环境
+function isLocalDev() {
+    return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+}
+
+// 获取API基地址（保留兼容性）
+function getApiBase() {
+    // 默认使用同源地址，适配Vercel和线上环境
+    // 仅当本地且手动开启use_local_proxy开关时，才通过localhost:8012代理
+    const use_local_proxy = false; // 手动开关，本地开发时可设为true
+    if (isLocalDev() && use_local_proxy) {
+        return 'http://localhost:8012';
+    }
+    return ''; // 空字符串表示使用同源地址
+}
+
+// 显示错误提示
+function showError(message) {
+    // 创建错误提示元素
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.textContent = message;
+    errorDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #ff4757;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(255, 71, 87, 0.3);
+        z-index: 10000;
+        max-width: 300px;
+        word-wrap: break-word;
+        animation: slideIn 0.3s ease-out;
+    `;
+    
+    // 添加动画样式
+    if (!document.querySelector('#error-animation-style')) {
+        const style = document.createElement('style');
+        style.id = 'error-animation-style';
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(errorDiv);
+    
+    // 3秒后自动移除
+    setTimeout(() => {
+        if (errorDiv.parentNode) {
+            errorDiv.parentNode.removeChild(errorDiv);
+        }
+    }, 3000);
+}
+
+// Ark文本生成API封装
+async function arkGenerate(prompt, model) {
+    try {
+        const response = await fetch(`${API_BASE}/api/ark`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Auth-Token': AUTH_TOKEN
+            },
+            body: JSON.stringify({ prompt, model })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || `HTTP ${response.status}`);
+        }
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        return data;
+    } catch (error) {
+        showError(`文本生成失败: ${error.message}`);
+        throw error;
+    }
+}
+
+// TTS语音合成API封装
+async function ttsSynthesize(payload) {
+    try {
+        const response = await fetch(`${API_BASE}/api/tts`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Auth-Token': AUTH_TOKEN
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || `HTTP ${response.status}`);
+        }
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        return data;
+    } catch (error) {
+        showError(`语音合成失败: ${error.message}`);
+        throw error;
+    }
+}
+
 // 全局状态
 const state = {
   textApiKey: storage.get('ve_text_api_key', ''),
@@ -164,34 +295,10 @@ function buildPrompt() {
 
 // 调用火山引擎文本生成API (Ark Chat Completions)
 async function callVolcTextAPI(prompt, apiKey, endpointId) {
-  if (!apiKey) {
-    throw new Error('请先配置文本大模型API Key');
-  }
   const model = (endpointId && endpointId.trim()) ? endpointId.trim() : 'doubao-1.5-pro-32k-250115';
+  
   try {
-    const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: '你是一个专业的胎教内容创作助手，擅长生成温馨、积极、有益的胎教内容。' },
-          { role: 'user', content: prompt }
-        ],
-        max_tokens: 2000,
-        temperature: 0.7
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`API请求失败: ${response.status} ${response.statusText}${errorData.error ? ` - ${errorData.error.message || errorData.error}` : ''}`);
-    }
-
-    const data = await response.json();
+    const data = await arkGenerate(prompt, model);
     if (data.choices && data.choices[0] && data.choices[0].message) {
       return data.choices[0].message.content;
     } else {
@@ -199,72 +306,43 @@ async function callVolcTextAPI(prompt, apiKey, endpointId) {
     }
   } catch (error) {
     console.error('调用文本API失败:', error);
-    throw new Error(`文本生成失败: ${error.message}`);
+    throw error; // 错误已在arkGenerate中处理和显示
   }
 }
 
 // 调用火山引擎TTS语音合成API  
 async function callVolcTTS(text, apiKey, accessToken, voiceType = 'BV421_streaming') {
-    if (!apiKey || !accessToken) {
-        throw new Error('TTS配置不完整，请检查AppID和Access Token');
-    }
-    
     try {
-        const response = await fetch('http://localhost:8013/api/tts', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                headers: {
-                    'Authorization': `Bearer;${accessToken}`
-                },
-                body: {
-                    app: {
-                        appid: apiKey,
-                        token: accessToken,
-                        cluster: "volcano_tts"
-                    },
-                    user: {
-                        uid: "test_user_001"
-                    },
-                    audio: {
-                        voice_type: voiceType,
-                        encoding: "mp3",
-                        speed_ratio: 1.0,
-                        volume_ratio: 1.0,
-                        pitch_ratio: 1.0
-                    },
-                    request: {
-                        reqid: Date.now().toString(),
-                        text: text,
-                        text_type: "plain",
-                        operation: "query",
-                        with_frontend: 1,
-                        frontend_type: "unitTson"
-                    }
-                }
-            })
-        });
+        const payload = {
+            text: text,
+            appid: apiKey,
+            voice_type: voiceType,
+            encoding: "mp3",
+            speed_ratio: 1.0,
+            volume_ratio: 1.0,
+            pitch_ratio: 1.0,
+            uid: "test_user_001",
+            cluster: "volcano_tts",
+            reqid: Date.now().toString(),
+            text_type: "plain",
+            operation: "query",
+            with_frontend: 1,
+            frontend_type: "unitTson"
+        };
+        
+        const data = await ttsSynthesize(payload);
+        if (!data || !data.data || !data.data.audio) {
+            throw new Error('TTS返回格式异常');
+        }
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`TTS API请求失败: ${response.status} ${response.statusText}${errorData.message ? ` - ${errorData.message}` : ''}`);
+        // data.data.audio is base64 mp3
+        const audioBytes = base64ToBytes(data.data.audio);
+        const blob = new Blob([audioBytes], { type: 'audio/mpeg' });
+        return { blob };
+    } catch (e) {
+        console.error(e);
+        throw e; // 错误已在ttsSynthesize中处理和显示
     }
-
-    const data = await response.json();
-    if (data.code === 3000 && data.data) {
-      const audioBase64 = data.data;
-      const audioBytes = base64ToBytes(audioBase64);
-      const blob = new Blob([audioBytes], { type: 'audio/mpeg' });
-      return { blob };
-    } else {
-      throw new Error(data.message || data.Message || 'TTS合成失败');
-    }
-  } catch (error) {
-    console.error('调用TTS API失败:', error);
-    throw new Error(`语音合成失败: ${error.message}`);
-  }
 }
 
 function setLoading(button, loading) {

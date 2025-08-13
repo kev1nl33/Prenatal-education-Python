@@ -1,0 +1,5 @@
+# Python dependencies for prenatal education assistant
+# Required for proxy server and cloud functions
+
+certifi>=2023.11.17
+urllib3>=2.0.7
