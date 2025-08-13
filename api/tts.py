@@ -80,28 +80,6 @@ class handler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": "Unauthorized"}, ensure_ascii=False).encode('utf-8'))
                 return
             
-            # 获取环境变量中的API密钥
-            tts_access_token = os.environ.get('TTS_ACCESS_TOKEN')
-            if not tts_access_token or tts_access_token in ['your_tts_access_token_here', 'sk-your-real-api-key-here']:
-                # 测试模式：返回模拟响应
-                mock_response = {
-                    "message": "Success",
-                    "code": 3000,
-                    "operation": "query",
-                    "sequence": 1,
-                    "data": {
-                        "audio": "UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=",
-                        "frontend_type": "unitTson",
-                        "with_frontend": 1
-                    }
-                }
-                self.send_response(200)
-                for key, value in cors_headers.items():
-                    self.send_header(key, value)
-                self.end_headers()
-                self.wfile.write(json.dumps(mock_response, ensure_ascii=False).encode('utf-8'))
-                return
-            
             # 解析请求体
             content_length = int(self.headers.get('Content-Length', 0))
             raw_data = self.rfile.read(content_length)
@@ -111,6 +89,14 @@ class handler(BaseHTTPRequestHandler):
             text = data.get("text", "")
             voice_type = data.get("voice_type", "zh_female_qingxin")
             
+            # 从请求中获取 TTS 配置，优先使用前端传来的配置
+            user_appid = data.get("appid", "").strip()
+            user_access_token = data.get("access_token", "").strip()
+            
+            # 如果前端没有提供配置，尝试使用环境变量
+            tts_access_token = user_access_token or os.environ.get('TTS_ACCESS_TOKEN', '')
+            tts_app_id = user_appid or os.environ.get('TTS_APP_ID', '')
+            
             if not text:
                 self.send_response(400)
                 for key, value in cors_headers.items():
@@ -119,10 +105,31 @@ class handler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": "text is required"}, ensure_ascii=False).encode('utf-8'))
                 return
             
+            # 检查必要的 TTS 配置
+            if not tts_access_token or tts_access_token in ['your_tts_access_token_here', 'sk-your-real-api-key-here']:
+                self.send_response(400)
+                for key, value in cors_headers.items():
+                    self.send_header(key, value)
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "error": "TTS Access Token is required. Please configure it in the frontend settings."
+                }, ensure_ascii=False).encode('utf-8'))
+                return
+                
+            if not tts_app_id or tts_app_id in ['your_tts_app_id_here']:
+                self.send_response(400)
+                for key, value in cors_headers.items():
+                    self.send_header(key, value)
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "error": "TTS App ID is required. Please configure it in the frontend settings."
+                }, ensure_ascii=False).encode('utf-8'))
+                return
+            
             # 构建TTS请求
             tts_payload = {
                 "app": {
-                    "appid": "3634495690",
+                    "appid": tts_app_id,
                     "token": tts_access_token,
                     "cluster": "volcano_tts"
                 },

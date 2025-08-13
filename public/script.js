@@ -254,11 +254,6 @@ el.generateContent.addEventListener('click', async () => {
 
 // 生成语音
 el.generateAudio.addEventListener('click', async () => {
-  // 移除 accessToken 检查，因为后端已不再需要验证
-  // if (!state.accessToken) {
-  //   alert('请先在上方保存Access Token');
-  //   return;
-  // }
   if (!state.lastContent) {
     alert('请先生成文本内容');
     return;
@@ -268,6 +263,7 @@ el.generateAudio.addEventListener('click', async () => {
     const payload = {
       text: state.lastContent,
       appid: state.ttsAppId,
+      access_token: state.accessToken, // 传给后端
       voice_type: state.voiceType || 'BV421_streaming',
       encoding: "mp3",
       speed_ratio: 1.0,
@@ -348,159 +344,134 @@ function setLoading(button, loading) {
   if (loading) {
     button.disabled = true;
     text.style.display = 'none';
+    if (!spinner) return;
     spinner.style.display = 'inline-block';
   } else {
     button.disabled = false;
-    text.style.display = 'inline-block';
+    text.style.display = 'inline';
+    if (!spinner) return;
     spinner.style.display = 'none';
   }
 }
 
 function addHistory(item) {
-  state.history.unshift(item);
-  state.history = state.history.slice(0, 20);
-  storage.set('ve_history', state.history);
+  // 限制历史记录长度
+  const MAX_HISTORY = 50;
+  const history = storage.get('ve_history', []);
+  history.unshift(item);
+  while (history.length > MAX_HISTORY) history.pop();
+  storage.set('ve_history', history);
   renderHistory();
 }
 
 function renderHistory() {
-  const list = el.historyList;
-  list.innerHTML = '';
-  if (!state.history.length) {
-    list.innerHTML = '<p class="empty-state">暂无历史记录</p>';
+  const history = storage.get('ve_history', []);
+  el.historyList.innerHTML = '';
+  if (history.length === 0) {
+    const p = document.createElement('p');
+    p.className = 'empty-state';
+    p.textContent = '暂无历史记录';
+    el.historyList.appendChild(p);
     return;
   }
-  for (const item of state.history) {
+  for (const item of history) {
     const div = document.createElement('div');
     div.className = 'history-item';
     div.innerHTML = `
-      <div class="history-header">
-        <div class="history-meta">类型：${item.type} · 情绪：${item.mood} · 长度：${item.duration}</div>
-        <div class="history-actions">
-          <button class="btn btn-outline btn-load">载入</button>
-          <button class="btn btn-outline btn-copy">复制</button>
-        </div>
+      <div class="history-meta">
+        <span class="badge">${escapeHtml(item.type)}</span>
+        <span class="badge">${escapeHtml(item.mood)}</span>
+        <span class="badge">${escapeHtml(item.duration)}</span>
+        <span class="time">${new Date(item.time).toLocaleString()}</span>
       </div>
-      <div class="history-text" style="white-space:pre-wrap; color:#334155; font-size:14px;">${escapeHtml((item.text||'').slice(0,300))}${item.text && item.text.length>300 ? '...':''}</div>
+      <div class="history-text">${escapeHtml(item.text)}</div>
     `;
-    div.querySelector('.btn-load').addEventListener('click', () => {
-      state.lastContent = item.text;
-      el.contentText.textContent = item.text;
-      el.resultSection.style.display = 'block';
-    });
-    div.querySelector('.btn-copy').addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(item.text || '');
-        alert('已复制到剪贴板');
-      } catch {
-        alert('复制失败');
-      }
-    });
-    list.appendChild(div);
+    el.historyList.appendChild(div);
   }
 }
 
 function escapeHtml(str) {
-  return String(str).replace(/[&<>"]|'/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;','\'':'&#39;'}[s]));
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
+// 生成静音占位音频
 async function synthSilence(seconds = 2) {
-  const audioCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 44100 * seconds, 44100);
-  const buffer = audioCtx.createBuffer(1, 44100 * seconds, 44100);
-  const source = audioCtx.createBufferSource();
-  source.buffer = buffer;
-  source.connect(audioCtx.destination);
-  source.start();
-  const rendered = await audioCtx.startRendering();
-  const wav = audioBufferToWav(rendered);
-  return new Blob([new DataView(wav)], { type: 'audio/wav' });
+  const sampleRate = 44100;
+  const numChannels = 2;
+  const length = seconds * sampleRate;
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  const buffer = audioContext.createBuffer(numChannels, length, sampleRate);
+  const audioData = audioBufferToWav(buffer);
+  return new Blob([audioData], { type: 'audio/wav' });
 }
 
-// 将 AudioBuffer 转为 WAV (PCM 16-bit)
 function audioBufferToWav(buffer) {
   const numOfChan = buffer.numberOfChannels;
-  const sampleRate = buffer.sampleRate;
-  const format = 1; // PCM
-  const bitDepth = 16;
+  const length = buffer.length * numOfChan * 2 + 44;
+  const bufferArray = new ArrayBuffer(length);
+  const view = new DataView(bufferArray);
+  const channels = [];
+  let offset = 0;
+  let pos = 0;
 
-  let result;
-  if (numOfChan === 2) {
-    const channelL = buffer.getChannelData(0);
-    const channelR = buffer.getChannelData(1);
-    result = interleave(channelL, channelR);
-  } else {
-    result = buffer.getChannelData(0);
+  setUint32(0x46464952); // "RIFF"
+  setUint32(length - 8); // file length - 8
+  setUint32(0x45564157); // "WAVE"
+
+  setUint32(0x20746d66); // "fmt "
+  setUint32(16); // length = 16
+  setUint16(1); // PCM (uncompressed)
+  setUint16(numOfChan);
+  setUint32(buffer.sampleRate);
+  setUint32(buffer.sampleRate * 2 * numOfChan); // avg. bytes/sec
+  setUint16(numOfChan * 2); // block-align
+  setUint16(16); // 16-bit
+
+  setUint32(0x61746164); // "data"
+  setUint32(length - pos - 4); // chunk length
+
+  for (let i = 0; i < buffer.numberOfChannels; i++) channels.push(buffer.getChannelData(i));
+
+  while (pos < length) {
+    for (let i = 0; i < numOfChan; i++) { // interleave channels
+      const sample = Math.max(-1, Math.min(1, channels[i][offset]));
+      view.setInt16(pos, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      pos += 2;
+    }
+    offset++;
   }
 
-  const bytesPerSample = bitDepth / 8;
-  const blockAlign = numOfChan * bytesPerSample;
-  const bufferLength = result.length * bytesPerSample;
-  const wavBuffer = new ArrayBuffer(44 + bufferLength);
-  const view = new DataView(wavBuffer);
-
-  /* RIFF identifier */ writeString(view, 0, 'RIFF');
-  /* file length */ view.setUint32(4, 36 + bufferLength, true);
-  /* RIFF type */ writeString(view, 8, 'WAVE');
-  /* format chunk identifier */ writeString(view, 12, 'fmt ');
-  /* format chunk length */ view.setUint32(16, 16, true);
-  /* sample format (raw) */ view.setUint16(20, format, true);
-  /* channel count */ view.setUint16(22, numOfChan, true);
-  /* sample rate */ view.setUint32(24, sampleRate, true);
-  /* byte rate (sample rate * block align) */ view.setUint32(28, sampleRate * blockAlign, true);
-  /* block align (channel count * bytes per sample) */ view.setUint16(32, blockAlign, true);
-  /* bits per sample */ view.setUint16(34, bitDepth, true);
-  /* data chunk identifier */ writeString(view, 36, 'data');
-  /* data chunk length */ view.setUint32(40, bufferLength, true);
-
-  floatTo16BitPCM(view, 44, result);
-
-  return view.buffer;
-}
-
-function interleave(left, right) {
-  const len = left.length + right.length;
-  const result = new Float32Array(len);
-  for (let i = 0, j = 0; i < len;) {
-    result[i++] = left[j];
-    result[i++] = right[j];
-    j++;
+  function setUint16(data) {
+    view.setUint16(pos, data, true); pos += 2;
   }
-  return result;
-}
 
-function writeString(view, offset, string) {
-  for (let i = 0; i < string.length; i++) {
-    view.setUint8(offset + i, string.charCodeAt(i));
+  function setUint32(data) {
+    view.setUint32(pos, data, true); pos += 4;
   }
+
+  return bufferArray;
 }
 
-function floatTo16BitPCM(output, offset, input) {
-  for (let i = 0; i < input.length; i++, offset += 2) {
-    let s = Math.max(-1, Math.min(1, input[i]));
-    output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-  }
-}
-
-// 辅助函数：生成UUID
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
 }
 
-// 辅助函数：base64转字节数组
 function base64ToBytes(base64) {
-  const binaryString = atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
+  const binary_string = atob(base64);
+  const len = binary_string.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binary_string.charCodeAt(i);
   }
   return bytes;
 }
 
-// 启动
 init();
