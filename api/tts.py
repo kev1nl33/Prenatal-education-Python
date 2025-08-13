@@ -3,8 +3,8 @@ import os
 import ssl
 import urllib.request
 from urllib.error import HTTPError
-from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs
+from http.server import BaseHTTPRequestHandler
 
 
 def _build_ssl_ctx():
@@ -61,35 +61,27 @@ class handler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": "Unauthorized"}, ensure_ascii=False).encode('utf-8'))
                 return
             
-            # 获取环境变量中的TTS访问令牌
+            # 获取环境变量中的API密钥
             tts_access_token = os.environ.get('TTS_ACCESS_TOKEN')
-            if not tts_access_token or tts_access_token in ['your_tts_access_token_here', 'test_token']:
-                # 测试模式：返回模拟TTS响应
-                if tts_access_token == 'your_tts_access_token_here' or not tts_access_token:
-                    mock_tts_response = {
-                        "message": "Success",
-                        "code": 3000,
-                        "operation": "query",
-                        "sequence": 1,
-                        "data": {
-                            "audio": "UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=",  # 极简的静音WAV base64
-                            "frontend_type": "unitTson",
-                            "with_frontend": 1
-                        }
+            if not tts_access_token or tts_access_token in ['your_tts_access_token_here', 'sk-your-real-api-key-here']:
+                # 测试模式：返回模拟响应
+                mock_response = {
+                    "message": "Success",
+                    "code": 3000,
+                    "operation": "query",
+                    "sequence": 1,
+                    "data": {
+                        "audio": "UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=",
+                        "frontend_type": "unitTson",
+                        "with_frontend": 1
                     }
-                    self.send_response(200)
-                    for key, value in cors_headers.items():
-                        self.send_header(key, value)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(mock_tts_response, ensure_ascii=False).encode('utf-8'))
-                    return
-                else:
-                    self.send_response(500)
-                    for key, value in cors_headers.items():
-                        self.send_header(key, value)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"error": "请在.env文件中配置有效的TTS_ACCESS_TOKEN"}, ensure_ascii=False).encode('utf-8'))
-                    return
+                }
+                self.send_response(200)
+                for key, value in cors_headers.items():
+                    self.send_header(key, value)
+                self.end_headers()
+                self.wfile.write(json.dumps(mock_response, ensure_ascii=False).encode('utf-8'))
+                return
             
             # 解析请求体
             content_length = int(self.headers.get('Content-Length', 0))
@@ -98,6 +90,8 @@ class handler(BaseHTTPRequestHandler):
             data = json.loads(raw) if raw else {}
             
             text = data.get("text", "")
+            voice_type = data.get("voice_type", "zh_female_qingxin")
+            
             if not text:
                 self.send_response(400)
                 for key, value in cors_headers.items():
@@ -106,30 +100,28 @@ class handler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": "text is required"}, ensure_ascii=False).encode('utf-8'))
                 return
             
-            # 构建TTS请求payload，使用传入的参数
+            # 构建TTS请求
             tts_payload = {
                 "app": {
-                    "appid": data.get("appid", os.environ.get('TTS_APP_ID', '')),
+                    "appid": "3634495690",
                     "token": tts_access_token,
-                    "cluster": data.get("cluster", "volcano_tts")
+                    "cluster": "volcano_tts"
                 },
                 "user": {
-                    "uid": data.get("uid", "test_user_001")
+                    "uid": "prenatal_education_user"
                 },
                 "audio": {
-                    "voice_type": data.get("voice_type", "zh_female_xinlingjitang_moon_bigtts"),
-                    "encoding": data.get("encoding", "mp3"),
-                    "speed_ratio": data.get("speed_ratio", 1.0),
-                    "volume_ratio": data.get("volume_ratio", 1.0),
-                    "pitch_ratio": data.get("pitch_ratio", 1.0)
+                    "voice_type": voice_type,
+                    "encoding": "mp3",
+                    "speed_ratio": 1.0,
+                    "volume_ratio": 1.0,
+                    "pitch_ratio": 1.0
                 },
                 "request": {
-                    "reqid": data.get("reqid", str(int(__import__('time').time() * 1000))),
+                    "reqid": "prenatal_education_req",
                     "text": text,
-                    "text_type": data.get("text_type", "plain"),
-                    "operation": data.get("operation", "query"),
-                    "with_frontend": data.get("with_frontend", 1),
-                    "frontend_type": data.get("frontend_type", "unitTson")
+                    "text_type": "plain",
+                    "operation": "query"
                 }
             }
             
@@ -139,7 +131,7 @@ class handler(BaseHTTPRequestHandler):
                 data=req_data,
                 headers={
                     "Content-Type": "application/json",
-                    "Authorization": f"Bearer;{tts_access_token}"
+                    "Authorization": f"Bearer {tts_access_token}"
                 }
             )
             
@@ -158,35 +150,33 @@ class handler(BaseHTTPRequestHandler):
                             self.end_headers()
                             self.wfile.write(json.dumps(tts_response, ensure_ascii=False).encode('utf-8'))
                         except json.JSONDecodeError:
-                            # 如果响应不是JSON格式，直接返回文本
+                            # 如果响应不是JSON格式，包装成标准格式
+                            wrapped_response = {
+                                "data": {
+                                    "audio": response_data.decode("utf-8")
+                                }
+                            }
                             self.send_response(200)
                             for key, value in cors_headers.items():
                                 self.send_header(key, value)
                             self.end_headers()
-                            self.wfile.write(json.dumps({"content": response_data.decode("utf-8")}, ensure_ascii=False).encode('utf-8'))
+                            self.wfile.write(json.dumps(wrapped_response, ensure_ascii=False).encode('utf-8'))
                 else:
                     with urllib.request.urlopen(req, timeout=30) as response:
                         response_data = response.read()
-                        # 解析TTS API的响应并返回JSON格式
-                        try:
-                            tts_response = json.loads(response_data.decode("utf-8"))
-                            self.send_response(200)
-                            for key, value in cors_headers.items():
-                                self.send_header(key, value)
-                            self.end_headers()
-                            self.wfile.write(json.dumps(tts_response, ensure_ascii=False).encode('utf-8'))
-                        except json.JSONDecodeError:
-                            # 如果响应不是JSON格式，直接返回文本
-                            self.send_response(200)
-                            for key, value in cors_headers.items():
-                                self.send_header(key, value)
-                            self.end_headers()
-                            self.wfile.write(json.dumps({"content": response_data.decode("utf-8")}, ensure_ascii=False).encode('utf-8'))
+                        self.send_response(200)
+                        for key, value in cors_headers.items():
+                            self.send_header(key, value)
+                        self.end_headers()
+                        self.wfile.write(response_data)
             except HTTPError as e:
                 err_body = e.read()
-                # 尝试解析错误响应为JSON，如果失败则包装为JSON格式
+                # 尝试解析错误响应为JSON，如果失败则包装为标准错误格式
                 try:
                     error_response = json.loads(err_body.decode("utf-8"))
+                    # 如果错误响应不包含error字段，包装成标准格式
+                    if 'error' not in error_response:
+                        error_response = {"error": str(error_response)}
                     self.send_response(e.code)
                     for key, value in cors_headers.items():
                         self.send_header(key, value)

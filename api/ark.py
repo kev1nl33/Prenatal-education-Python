@@ -3,8 +3,8 @@ import os
 import ssl
 import urllib.request
 from urllib.error import HTTPError
-from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs
+from http.server import BaseHTTPRequestHandler
 
 
 def _build_ssl_ctx():
@@ -64,19 +64,7 @@ class handler(BaseHTTPRequestHandler):
             # 获取环境变量中的API密钥
             ark_api_key = os.environ.get('ARK_API_KEY')
             if not ark_api_key or ark_api_key in ['your_ark_api_key_here', 'sk-your-real-api-key-here']:
-                try:
-                    self.send_response(500)
-                    for key, value in cors_headers.items():
-                        self.send_header(key, value)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"error": "请在.env文件中配置有效的ARK_API_KEY"}, ensure_ascii=False).encode('utf-8'))
-                except (BrokenPipeError, ConnectionResetError):
-                    # 客户端已断开连接，忽略错误
-                    print("Client disconnected during API key validation error response")
-                return
-            
-            # 临时添加：直接返回测试响应，绕过真实API调用
-            if ark_api_key == "test_api_key":
+                # 测试模式：返回模拟响应
                 mock_response = {
                     "choices": [{
                         "message": {
@@ -84,14 +72,11 @@ class handler(BaseHTTPRequestHandler):
                         }
                     }]
                 }
-                try:
-                    self.send_response(200)
-                    for key, value in cors_headers.items():
-                        self.send_header(key, value)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(mock_response, ensure_ascii=False).encode('utf-8'))
-                except (BrokenPipeError, ConnectionResetError):
-                    print("Client disconnected during mock response")
+                self.send_response(200)
+                for key, value in cors_headers.items():
+                    self.send_header(key, value)
+                self.end_headers()
+                self.wfile.write(json.dumps(mock_response, ensure_ascii=False).encode('utf-8'))
                 return
             
             # 解析请求体

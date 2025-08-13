@@ -1,7 +1,14 @@
 {
   "functions": {
     "api/**/*.py": {
-      "maxDuration": 10
+      "runtime": "python3.12",
+      "maxDuration": 30
     }
-  }
+  },
+  "builds": [
+    {
+      "src": "api/**/*.py",
+      "use": "@vercel/python"
+    }
+  ]
 }

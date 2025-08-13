@@ -208,8 +208,8 @@ el.saveConfig.addEventListener('click', () => {
   state.accessToken = el.accessToken.value.trim();
   state.voiceType = el.voiceType.value;
 
-  if (!state.textApiKey || !state.accessToken) {
-    alert('请至少填写文本API Key和Access Token');
+  if (!state.textApiKey) {
+    alert('请至少填写文本API Key');
     return;
   }
   storage.set('ve_text_api_key', state.textApiKey);
@@ -254,10 +254,11 @@ el.generateContent.addEventListener('click', async () => {
 
 // 生成语音
 el.generateAudio.addEventListener('click', async () => {
-  if (!state.accessToken) {
-    alert('请先在上方保存Access Token');
-    return;
-  }
+  // 移除 accessToken 检查，因为后端已不再需要验证
+  // if (!state.accessToken) {
+  //   alert('请先在上方保存Access Token');
+  //   return;
+  // }
   if (!state.lastContent) {
     alert('请先生成文本内容');
     return;
