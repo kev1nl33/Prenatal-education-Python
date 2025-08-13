@@ -124,26 +124,55 @@ def handler(request):
             if ctx is not None:
                 with urllib.request.urlopen(req, timeout=30, context=ctx) as response:
                     response_data = response.read()
-                    return {
-                        "statusCode": 200,
-                        "headers": cors_headers,
-                        "body": response_data.decode("utf-8")
-                    }
+                    # 解析TTS API的响应并返回JSON格式
+                    try:
+                        tts_response = json.loads(response_data.decode("utf-8"))
+                        return {
+                            "statusCode": 200,
+                            "headers": cors_headers,
+                            "body": json.dumps(tts_response, ensure_ascii=False)
+                        }
+                    except json.JSONDecodeError:
+                        # 如果响应不是JSON格式，直接返回文本
+                        return {
+                            "statusCode": 200,
+                            "headers": cors_headers,
+                            "body": json.dumps({"content": response_data.decode("utf-8")}, ensure_ascii=False)
+                        }
             else:
                 with urllib.request.urlopen(req, timeout=30) as response:
                     response_data = response.read()
-                    return {
-                        "statusCode": 200,
-                        "headers": cors_headers,
-                        "body": response_data.decode("utf-8")
-                    }
+                    # 解析TTS API的响应并返回JSON格式
+                    try:
+                        tts_response = json.loads(response_data.decode("utf-8"))
+                        return {
+                            "statusCode": 200,
+                            "headers": cors_headers,
+                            "body": json.dumps(tts_response, ensure_ascii=False)
+                        }
+                    except json.JSONDecodeError:
+                        # 如果响应不是JSON格式，直接返回文本
+                        return {
+                            "statusCode": 200,
+                            "headers": cors_headers,
+                            "body": json.dumps({"content": response_data.decode("utf-8")}, ensure_ascii=False)
+                        }
         except HTTPError as e:
             err_body = e.read()
-            return {
-                "statusCode": e.code,
-                "headers": cors_headers,
-                "body": err_body.decode("utf-8")
-            }
+            # 尝试解析错误响应为JSON，如果失败则包装为JSON格式
+            try:
+                error_response = json.loads(err_body.decode("utf-8"))
+                return {
+                    "statusCode": e.code,
+                    "headers": cors_headers,
+                    "body": json.dumps(error_response, ensure_ascii=False)
+                }
+            except json.JSONDecodeError:
+                return {
+                    "statusCode": e.code,
+                    "headers": cors_headers,
+                    "body": json.dumps({"error": err_body.decode("utf-8")}, ensure_ascii=False)
+                }
     except Exception as e:
         try:
             cors_headers = _get_cors_headers()
