@@ -100,6 +100,9 @@ async function arkGenerate(prompt, model) {
         
         const data = await response.json();
         
+        // 添加调试信息
+        console.log('API Response:', data);
+        
         if (!response.ok) {
             throw new Error(data.error || `HTTP ${response.status}`);
         }
@@ -108,8 +111,18 @@ async function arkGenerate(prompt, model) {
             throw new Error(data.error);
         }
         
+        // 验证响应格式
+        if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
+            throw new Error('API响应格式错误：缺少choices数组');
+        }
+        
+        if (!data.choices[0].message || !data.choices[0].message.content) {
+            throw new Error('API响应格式错误：缺少message.content');
+        }
+        
         return data;
     } catch (error) {
+        console.error('arkGenerate error:', error);
         showError(`文本生成失败: ${error.message}`);
         throw error;
     }

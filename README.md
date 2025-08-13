@@ -18,9 +18,8 @@
 
 1. 打开应用首页
 2. 在「配置设置」区域填写以下信息：
-   - **访问令牌 (AUTH_TOKEN)**: 用于API访问控制的认证令牌
-   - **文本大模型API Key**: 火山引擎文本模型 API Key
-   - **模型 Endpoint ID**: 火山引擎模型 Endpoint ID
+   - **文本大模型API Key**: 火山引擎豆包模型 API Key
+   - **模型 Endpoint ID**: 火山引擎豆包模型 Endpoint ID（可选，默认使用doubao-1.5-pro-32k-250115）
    - **TTS AppID**: 火山引擎 TTS App ID
    - **TTS Access Token**: 火山引擎 TTS Access Token
 3. 点击「保存配置」按钮
@@ -31,10 +30,9 @@
 
 | 变量名 | 说明 | 示例值 |
 |--------|------|--------|
-| `AUTH_TOKEN` | API访问认证令牌 | `your_secret_token` |
 | `ALLOWED_ORIGIN` | 允许的跨域来源 | `https://your-domain.vercel.app` |
-| `ARK_API_KEY` | 火山方舟API密钥 | `your_ark_api_key` |
-| `ARK_MODEL` | 火山方舟模型名称 | `kimi-k2-250711` |
+| `ARK_API_KEY` | 火山引擎豆包API密钥 | `your_ark_api_key` |
+| `ARK_MODEL` | 豆包模型名称 | `doubao-1.5-pro-32k-250115` |
 | `TTS_ACCESS_TOKEN` | TTS API访问令牌 | `your_tts_token` |
 | `TTS_APP_ID` | TTS应用ID | `your_app_id` |
 
