@@ -63,13 +63,33 @@ class handler(BaseHTTPRequestHandler):
             
             # 获取环境变量中的TTS访问令牌
             tts_access_token = os.environ.get('TTS_ACCESS_TOKEN')
-            if not tts_access_token:
-                self.send_response(500)
-                for key, value in cors_headers.items():
-                    self.send_header(key, value)
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": "TTS_ACCESS_TOKEN not configured"}, ensure_ascii=False).encode('utf-8'))
-                return
+            if not tts_access_token or tts_access_token in ['your_tts_access_token_here', 'test_token']:
+                # 测试模式：返回模拟TTS响应
+                if tts_access_token == 'your_tts_access_token_here' or not tts_access_token:
+                    mock_tts_response = {
+                        "message": "Success",
+                        "code": 3000,
+                        "operation": "query",
+                        "sequence": 1,
+                        "data": {
+                            "audio": "UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=",  # 极简的静音WAV base64
+                            "frontend_type": "unitTson",
+                            "with_frontend": 1
+                        }
+                    }
+                    self.send_response(200)
+                    for key, value in cors_headers.items():
+                        self.send_header(key, value)
+                    self.end_headers()
+                    self.wfile.write(json.dumps(mock_tts_response, ensure_ascii=False).encode('utf-8'))
+                    return
+                else:
+                    self.send_response(500)
+                    for key, value in cors_headers.items():
+                        self.send_header(key, value)
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"error": "请在.env文件中配置有效的TTS_ACCESS_TOKEN"}, ensure_ascii=False).encode('utf-8'))
+                    return
             
             # 解析请求体
             content_length = int(self.headers.get('Content-Length', 0))
