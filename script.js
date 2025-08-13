@@ -1,5 +1,5 @@
 const API_BASE = ""; // 同源，不要写域名
-let AUTH_TOKEN = localStorage.getItem("AUTH_TOKEN") || "";
+let AUTH_TOKEN = ""; // 将在初始化时设置
 
 // 简易本地存储封装
 const storage = {
@@ -12,12 +12,37 @@ const storage = {
 // 历史记录管理
 const HISTORY_KEY = 'prenatal_history';
 
-// 动态设置访问令牌
-function setAuthToken(token) {
-  AUTH_TOKEN = token || state.authToken;
+
+
+// 显示成功提示
+function showSuccess(message) {
+    const successDiv = document.createElement('div');
+    successDiv.className = 'success-message';
+    successDiv.textContent = message;
+    successDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #2ed573;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(46, 213, 115, 0.3);
+        z-index: 10000;
+        max-width: 300px;
+        word-wrap: break-word;
+        animation: slideIn 0.3s ease-out;
+    `;
+    
+    document.body.appendChild(successDiv);
+    
+    // 3秒后自动移除
+    setTimeout(() => {
+        if (successDiv.parentNode) {
+            successDiv.parentNode.removeChild(successDiv);
+        }
+    }, 3000);
 }
-
-
 
 // 显示错误提示
 function showError(message) {
@@ -166,7 +191,7 @@ function init() {
   el.voiceType.value = state.voiceType;
   
   // 设置AUTH_TOKEN
-  setAuthToken(state.authToken);
+  AUTH_TOKEN = state.authToken;
   
   renderHistory();
 }
@@ -192,7 +217,7 @@ el.saveConfig.addEventListener('click', () => {
   storage.set('ve_voice_type', state.voiceType);
 
   // 更新AUTH_TOKEN
-  setAuthToken(state.authToken);
+  AUTH_TOKEN = state.authToken;
 
   showSuccess('配置已保存');
 });
