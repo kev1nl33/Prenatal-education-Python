@@ -30,21 +30,7 @@ def _get_cors_headers():
 
 
 def _verify_auth(headers):
-    # 优先从环境变量读取AUTH_TOKEN，如果没有则从请求头读取
-    auth_token = os.environ.get('AUTH_TOKEN')
-    request_token = headers.get('X-Auth-Token') or headers.get('x-auth-token')
-    
-    if not auth_token and not request_token:
-        raise ValueError('AUTH_TOKEN environment variable is required')
-    
-    # 如果环境变量中有AUTH_TOKEN，则验证请求头中的token
-    if auth_token:
-        if request_token != auth_token:
-            return False
-    # 如果环境变量中没有AUTH_TOKEN，则直接使用请求头中的token（允许前端配置）
-    elif not request_token:
-        return False
-    
+    # 移除AUTH_TOKEN验证，允许直接访问
     return True
 
 
