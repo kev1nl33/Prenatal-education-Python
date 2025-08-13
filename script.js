@@ -14,7 +14,7 @@ const HISTORY_KEY = 'prenatal_history';
 
 // 动态设置访问令牌
 function setAuthToken(token) {
-    AUTH_TOKEN = token;
+  AUTH_TOKEN = token || state.authToken;
 }
 
 
@@ -123,6 +123,7 @@ async function ttsSynthesize(payload) {
 
 // 全局状态
 const state = {
+  authToken: storage.get('ve_auth_token', ''),
   textApiKey: storage.get('ve_text_api_key', ''),
   modelEndpoint: storage.get('ve_model_endpoint', ''),
   ttsAppId: storage.get('ve_tts_appid', ''),
@@ -135,6 +136,7 @@ const state = {
 
 // DOM 元素
 const el = {
+  authToken: document.getElementById('authToken'),
   textApiKey: document.getElementById('textApiKey'),
   modelEndpoint: document.getElementById('modelEndpoint'),
   ttsAppId: document.getElementById('appId'),
@@ -156,16 +158,22 @@ const el = {
 
 // 初始化
 function init() {
+  el.authToken.value = state.authToken;
   el.textApiKey.value = state.textApiKey;
   el.modelEndpoint.value = state.modelEndpoint;
   el.ttsAppId.value = state.ttsAppId;
   el.accessToken.value = state.accessToken;
   el.voiceType.value = state.voiceType;
+  
+  // 设置AUTH_TOKEN
+  setAuthToken(state.authToken);
+  
   renderHistory();
 }
 
 // 保存配置
 el.saveConfig.addEventListener('click', () => {
+  state.authToken = el.authToken.value.trim();
   state.textApiKey = el.textApiKey.value.trim();
   state.modelEndpoint = el.modelEndpoint.value.trim();
   state.ttsAppId = el.ttsAppId.value.trim();
@@ -176,12 +184,17 @@ el.saveConfig.addEventListener('click', () => {
     alert('请至少填写文本API Key和Access Token');
     return;
   }
+  storage.set('ve_auth_token', state.authToken);
   storage.set('ve_text_api_key', state.textApiKey);
   storage.set('ve_model_endpoint', state.modelEndpoint);
   storage.set('ve_tts_appid', state.ttsAppId);
   storage.set('ve_access_token', state.accessToken);
   storage.set('ve_voice_type', state.voiceType);
-  alert('配置已保存');
+
+  // 更新AUTH_TOKEN
+  setAuthToken(state.authToken);
+
+  showSuccess('配置已保存');
 });
 
 // 生成胎教内容
