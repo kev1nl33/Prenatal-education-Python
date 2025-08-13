@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能胎教助手</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <svg class="logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C13.1046 2 14 2.89543 14 4V6H16C17.1046 6 18 6.89543 18 8V18C18 19.1046 17.1046 20 16 20H8C6.89543 20 6 19.1046 6 18V8C6 6.89543 6.89543 6 8 6H10V4C10 2.89543 10.8954 2 12 2Z" fill="currentColor"/>
+                    <circle cx="12" cy="13" r="3" fill="white"/>
+                </svg>
+                <h1>智能胎教助手</h1>
+            </div>
+            <p class="subtitle">用AI为你和宝宝创造美好的胎教时光</p>
+        </header>
+
+        <main class="main">
+            <!-- API配置区域 -->
+            <section class="config-section" id="configSection">
+                <h2>API配置</h2>
+                <div class="config-form">
+                    <div class="form-group">
+                        <label for="textApiKey">文本大模型API Key:</label>
+                        <input type="password" id="textApiKey" placeholder="请输入火山引擎文本模型API Key">
+                    </div>
+                    <div class="form-group">
+                        <label for="modelEndpoint">模型 Endpoint ID:</label>
+                        <input type="text" id="modelEndpoint" placeholder="请输入模型Endpoint ID，如：ep-20241201-xxxxx">
+                        <small class="form-hint">创建自定义推理接入点后获得的Endpoint ID，也可使用模型名称如：doubao-1.5-pro-32k-250115</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="appId">TTS AppID:</label>
+                        <input type="text" id="appId" placeholder="请输入火山引擎TTS应用ID">
+                        <small class="form-hint">在火山引擎控制台创建TTS应用后获得</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="accessToken">TTS Access Token:</label>
+                        <input type="password" id="accessToken" placeholder="请输入TTS Access Token">
+                        <small class="form-hint">在火山引擎TTS控制台获取的访问令牌</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="voiceType">语音类型:</label>
+                        <select id="voiceType">
+                            <!-- 新增：BigTTS moon_bigtss 语音（与你的控制台一致） -->
+                            <option value="zh_male_shenyeboke_moon_bigtts">男声-深夜播客</option>
+                            <option value="zh_female_xinlingjitang_moon_bigtts">女声- 温柔知性</option>
+                            <option value="zh_female_shaoergushi_mars_bigtts">儿童-少儿故事</option>
+                        </select>
+                    </div>
+                    <button id="saveConfig" class="btn btn-primary">保存配置</button>
+                </div>
+            </section>
+
+            <!-- 胎教内容生成区域 -->
+            <section class="content-section">
+                <h2>生成胎教内容</h2>
+                <div class="content-form">
+                    <div class="form-group">
+                        <label for="contentType">内容类型:</label>
+                        <select id="contentType">
+                            <option value="story">胎教故事</option>
+                            <option value="music">音乐胎教</option>
+                            <option value="poetry">诗歌朗诵</option>
+                            <option value="nature">自然声音</option>
+                            <option value="wisdom">育儿智慧</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="mood">期望情绪:</label>
+                        <select id="mood">
+                            <option value="calm">平静放松</option>
+                            <option value="happy">愉悦开心</option>
+                            <option value="peaceful">安详宁静</option>
+                            <option value="warm">温暖关爱</option>
+                            <option value="energetic">活力充沛</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="duration">内容长度:</label>
+                        <select id="duration">
+                            <option value="short">短篇 (3-5分钟)</option>
+                            <option value="medium">中篇 (5-10分钟)</option>
+                            <option value="long">长篇 (10-15分钟)</option>
+                        </select>
+                    </div>
+                    <button id="generateContent" class="btn btn-primary">
+                        <span class="btn-text">生成内容</span>
+                        <div class="loading-spinner" style="display: none;"></div>
+                    </button>
+                </div>
+            </section>
+
+            <!-- 内容展示区域 -->
+            <section class="result-section" id="resultSection" style="display: none;">
+                <h2>生成的胎教内容</h2>
+                <div class="content-display">
+                    <div class="content-text" id="contentText"></div>
+                    <div class="audio-controls">
+                        <button id="generateAudio" class="btn btn-secondary">
+                            <span class="btn-text">生成语音</span>
+                            <div class="loading-spinner" style="display: none;"></div>
+                        </button>
+                        <div class="audio-player" id="audioPlayer" style="display: none;">
+                            <audio controls id="audioElement">
+                                您的浏览器不支持音频播放。
+                            </audio>
+                            <button id="downloadAudio" class="btn btn-outline">下载音频</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 历史记录区域 -->
+            <section class="history-section">
+                <h2>历史记录</h2>
+                <div class="history-list" id="historyList">
+                    <p class="empty-state">暂无历史记录</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
