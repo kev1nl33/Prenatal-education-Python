@@ -157,7 +157,8 @@ class handler(BaseHTTPRequestHandler):
                 data=req_data,
                 headers={
                     "Content-Type": "application/json",
-                    "Authorization": f"Bearer {tts_access_token}"
+                    # 注意：火山引擎 TTS 要求 Authorization 头为 "Bearer; {token}"（分号分隔）
+                    "Authorization": f"Bearer; {tts_access_token}"
                 }
             )
             
