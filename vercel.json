@@ -4,11 +4,5 @@
       "runtime": "python3.12",
       "maxDuration": 10
     }
-  },
-  "builds": [
-    {
-      "src": "api/**/*.py",
-      "use": "@vercel/python"
-    }
-  ]
+  }
 }
