@@ -278,7 +278,7 @@ const state = {
   modelEndpoint: storage.get('ve_model_endpoint', ''),
   ttsAppId: storage.get('ve_tts_appid', ''),
   accessToken: storage.get('ve_access_token', ''),
-  voiceType: storage.get('ve_voice_type', 'BV001_streaming'),
+  voiceType: storage.get('ve_voice_type', 'zh_male_shenyeboke_moon_bigtts'),
   testMode: storage.get('ve_test_mode', false),
   lastContent: '',
   lastAudioBlob: null,
@@ -291,7 +291,6 @@ const el = {
   modelEndpoint: document.getElementById('modelEndpoint'),
   ttsAppId: document.getElementById('appId'),
   accessToken: document.getElementById('accessToken'),
-  voiceType: document.getElementById('voiceType'),
   testMode: document.getElementById('testMode'),
   saveConfig: document.getElementById('saveConfig'),
   contentType: document.getElementById('contentType'),
@@ -342,7 +341,6 @@ function init() {
   el.modelEndpoint.value = state.modelEndpoint;
   el.ttsAppId.value = state.ttsAppId;
   el.accessToken.value = state.accessToken;
-  el.voiceType.value = state.voiceType;
   el.testMode.checked = state.testMode;
   
   // 初始化内容卡片选择
@@ -408,11 +406,6 @@ function initVoiceSelector() {
   el.voiceSelector.addEventListener('change', (e) => {
     const selectedVoice = e.target.value;
     state.voiceType = selectedVoice;
-    
-    // 同步更新设置中的语音类型
-    if (el.voiceType) {
-      el.voiceType.value = selectedVoice;
-    }
     
     // 保存到localStorage
     storage.set('ve_voice_type', selectedVoice);
@@ -538,6 +531,8 @@ function deleteHistoryItem(index) {
     state.history.splice(index, 1);
     storage.set('ve_history', state.history);
     renderHistoryInModal();
+    // 同时更新主页面的历史记录显示
+    renderHistory();
     showSuccess('历史记录已删除');
   }
 }
@@ -547,6 +542,8 @@ function clearAllHistoryRecords() {
   state.history = [];
   storage.set('ve_history', state.history);
   renderHistoryInModal();
+  // 同时更新主页面的历史记录显示
+  renderHistory();
   showSuccess('所有历史记录已清空');
 }
 
@@ -579,7 +576,8 @@ el.saveConfig.addEventListener('click', () => {
   state.modelEndpoint = el.modelEndpoint.value.trim();
   state.ttsAppId = el.ttsAppId.value.trim();
   state.accessToken = el.accessToken.value.trim();
-  state.voiceType = el.voiceType.value;
+  // 语音类型现在从voiceSelector获取
+  state.voiceType = el.voiceSelector.value;
   state.testMode = el.testMode.checked;
   
   // 在非测试模式下验证必要的配置
@@ -646,7 +644,7 @@ el.generateAudio.addEventListener('click', async () => {
       text: state.lastContent,
       appid: state.ttsAppId,
       access_token: state.accessToken, // 传给后端
-      voice_type: state.voiceType || 'BV421_streaming',
+      voice_type: state.voiceType || 'zh_male_shenyeboke_moon_bigtts',
       encoding: "mp3",
       speed_ratio: 1.0,
       volume_ratio: 1.0,
@@ -758,6 +756,10 @@ function addHistory(item) {
   history.unshift(item);
   while (history.length > MAX_HISTORY) history.pop();
   storage.set('ve_history', history);
+  
+  // 同步更新state.history
+  state.history = history;
+  
   renderHistory();
 }
 
