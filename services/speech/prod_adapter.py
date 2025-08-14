@@ -28,7 +28,13 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
         self.timeout = int(os.environ.get('TTS_TIMEOUT', '10'))
         
         if not self.app_id or not self.access_token:
-            raise ValueError("TTS_APP_ID and TTS_ACCESS_TOKEN must be set in environment variables")
+            missing_vars = []
+            if not self.app_id:
+                missing_vars.append('TTS_APP_ID')
+            if not self.access_token:
+                missing_vars.append('TTS_ACCESS_TOKEN')
+            
+            raise ValueError(f"生产环境TTS配置错误：缺少环境变量 {', '.join(missing_vars)}。请在Vercel项目设置中配置这些环境变量后重新部署。")
     
     def _build_ssl_context(self):
         """构建SSL上下文"""
@@ -128,15 +134,15 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                 else:
                     # 不重试的错误或已达最大重试次数
                     if e.code == 401:
-                        raise Exception("Authentication failed: Invalid access token")
+                        raise Exception("TTS认证失败：API密钥无效。请检查TTS_ACCESS_TOKEN环境变量是否正确配置。")
                     elif e.code == 403:
-                        raise Exception("Access forbidden: Check your permissions")
+                        raise Exception("TTS访问被拒绝：请检查API权限设置。可能是TTS_APP_ID配置错误或账户权限不足。")
                     elif e.code == 429:
-                        raise Exception("Rate limit exceeded: Please try again later")
+                        raise Exception("TTS请求频率超限：请稍后重试。如果问题持续，请检查API配额设置。")
                     elif e.code in [400, 422]:
-                        raise Exception(f"Invalid request: {error_body}")
+                        raise Exception(f"TTS请求参数错误：{error_body}。请检查文本内容和语音参数设置。")
                     else:
-                        raise Exception(f"TTS service error ({e.code}): {error_body}")
+                        raise Exception(f"TTS服务错误 ({e.code})：{error_body}。请检查网络连接和API服务状态。")
                         
             except Exception as e:
                 last_exception = e
