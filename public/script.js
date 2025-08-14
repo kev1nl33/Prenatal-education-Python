@@ -237,6 +237,7 @@ async function ttsSynthesize(payload) {
     try {
         // 检查是否为测试模式
         if (state.testMode) {
+            console.warn('运行在测试模式，将生成模拟音频');
             return await generateMockTTS();
         }
         
@@ -263,6 +264,14 @@ async function ttsSynthesize(payload) {
         
         if (data.error) {
             throw new Error(data.error);
+        }
+        
+        // 检查运行模式并显示警告
+        if (data.mode && data.mode !== 'prod') {
+            console.warn(`TTS运行在${data.mode}模式，可能生成占位音频`);
+            if (data.warning) {
+                console.warn(`警告: ${data.warning}`);
+            }
         }
         
         return data;

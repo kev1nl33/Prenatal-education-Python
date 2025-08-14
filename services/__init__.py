@@ -22,7 +22,17 @@ def get_speech_service(mode: Optional[str] = None) -> SpeechSynthesizer:
         ValueError: 当模式不支持时
     """
     if mode is None:
-        mode = os.getenv('MODE', 'local').lower()
+        # 检测运行环境，优先使用生产模式
+        mode = os.getenv('MODE')
+        if mode is None:
+            # 根据环境自动检测模式
+            if os.getenv('VERCEL') or os.getenv('VERCEL_ENV'):
+                mode = 'prod'  # Vercel环境默认使用生产模式
+            elif os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('RENDER'):
+                mode = 'prod'  # 其他云平台默认使用生产模式
+            else:
+                mode = 'local'  # 本地开发环境
+        mode = mode.lower()
     
     mode = mode.lower()
     
@@ -38,7 +48,16 @@ def get_speech_service(mode: Optional[str] = None) -> SpeechSynthesizer:
 
 def get_current_mode() -> str:
     """获取当前运行模式"""
-    return os.getenv('MODE', 'local').lower()
+    mode = os.getenv('MODE')
+    if mode is None:
+        # 根据环境自动检测模式
+        if os.getenv('VERCEL') or os.getenv('VERCEL_ENV'):
+            mode = 'prod'  # Vercel环境默认使用生产模式
+        elif os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('RENDER'):
+            mode = 'prod'  # 其他云平台默认使用生产模式
+        else:
+            mode = 'local'  # 本地开发环境
+    return mode.lower()
 
 
 def is_dry_run() -> bool:

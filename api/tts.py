@@ -210,6 +210,16 @@ class handler(BaseHTTPRequestHandler):
             # 获取语音服务实例
             try:
                 speech_service = get_speech_service()
+                
+                # 检查模式并添加警告
+                current_mode = get_current_mode()
+                if current_mode in ['local', 'sandbox']:
+                    print(f"WARNING: TTS service running in {current_mode} mode. Audio may be placeholder/silent.")
+                    if current_mode == 'local':
+                        print("INFO: Local mode generates placeholder audio files. Set MODE=prod for real TTS.")
+                    elif current_mode == 'sandbox':
+                        print("INFO: Sandbox mode generates test audio. Set MODE=prod for real TTS.")
+                        
             except ValueError as e:
                 cors_headers = _get_cors_headers(request_id=request_id, mode=mode)
                 self.send_response(500)
@@ -316,7 +326,9 @@ class handler(BaseHTTPRequestHandler):
                     "fromCache": True,
                     "requestId": request_id,
                     "provider": speech_service.get_provider_name(),
-                    "latency": round(latency, 3)
+                    "latency": round(latency, 3),
+                    "mode": current_mode,
+                    "warning": "Audio may be placeholder/silent" if current_mode in ['local', 'sandbox'] else None
                 }
                 self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
                 return
@@ -355,7 +367,9 @@ class handler(BaseHTTPRequestHandler):
                     "fromCache": False,
                     "requestId": request_id,
                     "provider": speech_service.get_provider_name(),
-                    "latency": round(latency, 3)
+                    "latency": round(latency, 3),
+                    "mode": current_mode,
+                    "warning": "Audio may be placeholder/silent" if current_mode in ['local', 'sandbox'] else None
                 }
                 self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
                 
