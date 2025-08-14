@@ -3,9 +3,27 @@ import os
 import ssl
 import urllib.request
 import base64
+import uuid
+import time
 from urllib.error import HTTPError
 from urllib.parse import parse_qs
 from http.server import BaseHTTPRequestHandler
+
+# 导入新的语音服务架构
+import sys
+from pathlib import Path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+from services import (
+    get_speech_service, 
+    get_current_mode, 
+    is_dry_run, 
+    is_kill_switch_enabled,
+    get_daily_cost_limit
+)
+from services.costbook import get_cost_book
+from services.cache import get_tts_cache
 
 
 def _build_ssl_ctx():
@@ -19,20 +37,51 @@ def _build_ssl_ctx():
             return None
 
 
-def _get_cors_headers():
+def _get_cors_headers(request_id=None, from_cache=False, cost_estimated=0.0, mode=None):
     allowed_origin = os.environ.get('ALLOWED_ORIGIN', '*')
     
-    return {
+    headers = {
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": allowed_origin,
         "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, X-Auth-Token",
+        "Access-Control-Allow-Headers": "Content-Type, X-Auth-Token, X-Req-Id, X-Mode, X-Dry-Run",
     }
+    
+    # 添加自定义响应头
+    if request_id:
+        headers["X-Req-Id"] = request_id
+    if from_cache is not None:
+        headers["X-From-Cache"] = "true" if from_cache else "false"
+    if cost_estimated is not None:
+        headers["X-Cost-Estimated"] = str(cost_estimated)
+    if mode:
+        headers["X-Mode"] = mode
+    
+    return headers
 
 
 def _verify_auth(headers):
-    # 移除AUTH_TOKEN验证，允许直接访问
-    return True
+    """验证访问令牌"""
+    auth_token = os.environ.get('AUTH_TOKEN', '')
+    if not auth_token:
+        return True  # 如果未设置AUTH_TOKEN，则允许访问
+    
+    request_token = headers.get('X-Auth-Token', '')
+    return request_token == auth_token
+
+
+def _check_origin(headers):
+    """检查请求来源"""
+    allowed_origins = os.environ.get('ALLOWED_ORIGIN', '*')
+    if allowed_origins == '*':
+        return True
+    
+    origin = headers.get('Origin', '')
+    if not origin:
+        return True  # 允许无Origin的请求（如Postman）
+    
+    allowed_list = [o.strip() for o in allowed_origins.split(',')]
+    return origin in allowed_list
 
 
 class handler(BaseHTTPRequestHandler):
@@ -69,16 +118,62 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"error": str(e)}, ensure_ascii=False).encode('utf-8'))
     
     def do_POST(self):
+        # 生成请求ID
+        request_id = str(uuid.uuid4())[:8]
+        start_time = time.time()
+        
+        # 初始化响应变量
+        from_cache = False
+        cost_estimated = 0.0
+        mode = get_current_mode()
+        
         try:
-            cors_headers = _get_cors_headers()
+            # 中间件：检查紧急停止开关
+            if is_kill_switch_enabled():
+                cors_headers = _get_cors_headers(request_id=request_id, mode=mode)
+                self.send_response(503)
+                for key, value in cors_headers.items():
+                    self.send_header(key, value)
+                self.end_headers()
+                response = {
+                    "ok": False,
+                    "errorCode": "SERVICE_DISABLED",
+                    "message": "Temporarily disabled by admin",
+                    "requestId": request_id
+                }
+                self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
+                return
             
-            # 验证访问令牌
+            # 中间件：验证访问令牌
             if not _verify_auth(self.headers):
+                cors_headers = _get_cors_headers(request_id=request_id, mode=mode)
                 self.send_response(401)
                 for key, value in cors_headers.items():
                     self.send_header(key, value)
                 self.end_headers()
-                self.wfile.write(json.dumps({"error": "Unauthorized"}, ensure_ascii=False).encode('utf-8'))
+                response = {
+                    "ok": False,
+                    "errorCode": "UNAUTHORIZED",
+                    "message": "Invalid or missing authentication token",
+                    "requestId": request_id
+                }
+                self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
+                return
+            
+            # 中间件：检查请求来源
+            if not _check_origin(self.headers):
+                cors_headers = _get_cors_headers(request_id=request_id, mode=mode)
+                self.send_response(403)
+                for key, value in cors_headers.items():
+                    self.send_header(key, value)
+                self.end_headers()
+                response = {
+                    "ok": False,
+                    "errorCode": "FORBIDDEN_ORIGIN",
+                    "message": "Request origin not allowed",
+                    "requestId": request_id
+                }
+                self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
                 return
             
             # 解析请求体
@@ -87,151 +182,244 @@ class handler(BaseHTTPRequestHandler):
             raw = raw_data.decode("utf-8") if raw_data else ""
             data = json.loads(raw) if raw else {}
             
-            text = data.get("text", "")
+            # 提取参数
+            text = data.get("text", "").strip()
             voice_type = data.get("voice_type", "zh_female_qingxin")
+            quality = data.get("quality", "draft")  # draft 或 high
+            dry_run_param = data.get("dry_run", False)
             
-            # 从请求中获取 TTS 配置，优先使用前端传来的配置
-            user_appid = data.get("appid", "").strip()
-            user_access_token = data.get("access_token", "").strip()
+            # 检查是否为干跑模式
+            is_dry_run_mode = is_dry_run() or dry_run_param
             
-            # 如果前端没有提供配置，尝试使用环境变量
-            tts_access_token = user_access_token or os.environ.get('TTS_ACCESS_TOKEN', '')
-            tts_app_id = user_appid or os.environ.get('TTS_APP_ID', '')
-            
+            # 参数验证
             if not text:
+                cors_headers = _get_cors_headers(request_id=request_id, mode=mode)
                 self.send_response(400)
                 for key, value in cors_headers.items():
                     self.send_header(key, value)
                 self.end_headers()
-                self.wfile.write(json.dumps({"error": "text is required"}, ensure_ascii=False).encode('utf-8'))
+                response = {
+                    "ok": False,
+                    "errorCode": "INVALID_PARAMETER",
+                    "message": "Text parameter is required and cannot be empty",
+                    "requestId": request_id
+                }
+                self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
                 return
             
-            # 检查必要的 TTS 配置
-            if not tts_access_token or tts_access_token in ['your_tts_access_token_here', 'sk-your-real-api-key-here']:
-                self.send_response(400)
+            # 获取语音服务实例
+            try:
+                speech_service = get_speech_service()
+            except ValueError as e:
+                cors_headers = _get_cors_headers(request_id=request_id, mode=mode)
+                self.send_response(500)
                 for key, value in cors_headers.items():
                     self.send_header(key, value)
                 self.end_headers()
-                self.wfile.write(json.dumps({
-                    "error": "TTS Access Token is required. Please configure it in the frontend settings."
-                }, ensure_ascii=False).encode('utf-8'))
+                response = {
+                    "ok": False,
+                    "errorCode": "SERVICE_CONFIG_ERROR",
+                    "message": str(e),
+                    "requestId": request_id
+                }
+                self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
                 return
+            
+            # 费用估算
+            try:
+                cost_estimated = speech_service.estimate_cost(text)
+            except Exception as e:
+                print(f"Warning: Failed to estimate cost: {e}")
+                cost_estimated = 0.0
+            
+            # 检查每日费用限制
+            cost_book = get_cost_book()
+            daily_limit = get_daily_cost_limit()
+            
+            if not is_dry_run_mode and cost_book.will_exceed_today(daily_limit):
+                cors_headers = _get_cors_headers(
+                    request_id=request_id, 
+                    cost_estimated=cost_estimated, 
+                    mode=mode
+                )
+                self.send_response(429)
+                for key, value in cors_headers.items():
+                    self.send_header(key, value)
+                self.end_headers()
+                response = {
+                    "ok": False,
+                    "errorCode": "DAILY_LIMIT_EXCEEDED",
+                    "message": f"Daily cost limit of {daily_limit} exceeded. Please try again tomorrow.",
+                    "cost": cost_estimated,
+                    "requestId": request_id
+                }
+                self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
+                return
+            
+            # 如果是干跑模式，只返回估算信息
+            if is_dry_run_mode:
+                cors_headers = _get_cors_headers(
+                    request_id=request_id, 
+                    cost_estimated=cost_estimated, 
+                    mode=mode
+                )
+                self.send_response(200)
+                for key, value in cors_headers.items():
+                    self.send_header(key, value)
+                self.end_headers()
                 
-            if not tts_app_id or tts_app_id in ['your_tts_app_id_here']:
-                self.send_response(400)
+                latency = time.time() - start_time
+                response = {
+                    "ok": True,
+                    "errorCode": None,
+                    "message": "Dry run completed successfully",
+                    "cost": cost_estimated,
+                    "fromCache": False,
+                    "requestId": request_id,
+                    "provider": speech_service.get_provider_name(),
+                    "latency": round(latency, 3),
+                    "dryRun": True
+                }
+                self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
+                return
+            
+            # 检查缓存
+            cache = get_tts_cache()
+            params = {"quality": quality}
+            cached_audio = cache.get(text, voice_type, params)
+            
+            if cached_audio:
+                from_cache = True
+                audio_base64 = base64.b64encode(cached_audio).decode('utf-8')
+                
+                # 记录缓存命中
+                latency = time.time() - start_time
+                cost_book.commit(cost=0.0, latency=latency, from_cache=True)
+                
+                cors_headers = _get_cors_headers(
+                    request_id=request_id, 
+                    from_cache=True, 
+                    cost_estimated=0.0, 
+                    mode=mode
+                )
+                self.send_response(200)
                 for key, value in cors_headers.items():
                     self.send_header(key, value)
                 self.end_headers()
-                self.wfile.write(json.dumps({
-                    "error": "TTS App ID is required. Please configure it in the frontend settings."
-                }, ensure_ascii=False).encode('utf-8'))
+                
+                response = {
+                    "ok": True,
+                    "errorCode": None,
+                    "message": "Success",
+                    "data": audio_base64,
+                    "cost": 0.0,
+                    "fromCache": True,
+                    "requestId": request_id,
+                    "provider": speech_service.get_provider_name(),
+                    "latency": round(latency, 3)
+                }
+                self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
                 return
             
-            # 构建TTS请求
-            tts_payload = {
-                "app": {
-                    "appid": tts_app_id,
-                    "token": tts_access_token,
-                    "cluster": "volcano_tts"
-                },
-                "user": {
-                    "uid": "prenatal_education_user"
-                },
-                "audio": {
-                    "voice_type": voice_type,
-                    "encoding": "mp3",
-                    "speed_ratio": 1.0,
-                    "volume_ratio": 1.0,
-                    "pitch_ratio": 1.0
-                },
-                "request": {
-                    "reqid": "prenatal_education_req",
-                    "text": text,
-                    "text_type": "plain",
-                    "operation": "query"
-                }
-            }
-            
-            req_data = json.dumps(tts_payload).encode("utf-8")
-            req = urllib.request.Request(
-                "https://openspeech.bytedance.com/api/v1/tts",
-                data=req_data,
-                headers={
-                    "Content-Type": "application/json",
-                    # 注意：火山引擎 TTS 要求 Authorization 头为 "Bearer; {token}"（分号分隔）
-                    "Authorization": f"Bearer; {tts_access_token}"
-                }
-            )
-            
-            # 发送请求
-            ctx = _build_ssl_ctx()
+            # 调用语音合成服务
             try:
-                if ctx is not None:
-                    with urllib.request.urlopen(req, timeout=30, context=ctx) as response:
-                        response_data = response.read()
-                        # 解析TTS API的响应并返回JSON格式
-                        try:
-                            tts_response = json.loads(response_data.decode("utf-8"))
-                            self.send_response(200)
-                            for key, value in cors_headers.items():
-                                self.send_header(key, value)
-                            self.end_headers()
-                            self.wfile.write(json.dumps(tts_response, ensure_ascii=False).encode('utf-8'))
-                        except json.JSONDecodeError:
-                            # 如果响应不是JSON格式，说明是音频二进制数据，需要base64编码
-                            audio_base64 = base64.b64encode(response_data).decode('utf-8')
-                            wrapped_response = {
-                                "data": audio_base64
-                            }
-                            self.send_response(200)
-                            for key, value in cors_headers.items():
-                                self.send_header(key, value)
-                            self.end_headers()
-                            self.wfile.write(json.dumps(wrapped_response, ensure_ascii=False).encode('utf-8'))
-                else:
-                    with urllib.request.urlopen(req, timeout=30) as response:
-                        response_data = response.read()
-                        # 不使用SSL时也要正确处理响应
-                        try:
-                            tts_response = json.loads(response_data.decode("utf-8"))
-                            self.send_response(200)
-                            for key, value in cors_headers.items():
-                                self.send_header(key, value)
-                            self.end_headers()
-                            self.wfile.write(json.dumps(tts_response, ensure_ascii=False).encode('utf-8'))
-                        except json.JSONDecodeError:
-                            # 如果响应不是JSON格式，说明是音频二进制数据，需要base64编码
-                            audio_base64 = base64.b64encode(response_data).decode('utf-8')
-                            wrapped_response = {
-                                "data": audio_base64
-                            }
-                            self.send_response(200)
-                            for key, value in cors_headers.items():
-                                self.send_header(key, value)
-                            self.end_headers()
-                            self.wfile.write(json.dumps(wrapped_response, ensure_ascii=False).encode('utf-8'))
-            except HTTPError as e:
-                err_body = e.read()
-                # 尝试解析错误响应为JSON，如果失败则包装为标准错误格式
-                try:
-                    error_response = json.loads(err_body.decode("utf-8"))
-                    # 如果错误响应不包含error字段，包装成标准格式
-                    if 'error' not in error_response:
-                        error_response = {"error": str(error_response)}
-                    self.send_response(e.code)
-                    for key, value in cors_headers.items():
-                        self.send_header(key, value)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(error_response, ensure_ascii=False).encode('utf-8'))
-                except json.JSONDecodeError:
-                    self.send_response(e.code)
-                    for key, value in cors_headers.items():
-                        self.send_header(key, value)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"error": err_body.decode("utf-8")}, ensure_ascii=False).encode('utf-8'))
+                audio_data = speech_service.synthesize(text)
+                
+                # 缓存结果
+                cache.set(text, audio_data, voice_type, params)
+                
+                # 记录调用
+                latency = time.time() - start_time
+                cost_book.commit(cost=cost_estimated, latency=latency, from_cache=False)
+                
+                # 返回成功响应
+                audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+                
+                cors_headers = _get_cors_headers(
+                    request_id=request_id, 
+                    from_cache=False, 
+                    cost_estimated=cost_estimated, 
+                    mode=mode
+                )
+                self.send_response(200)
+                for key, value in cors_headers.items():
+                    self.send_header(key, value)
+                self.end_headers()
+                
+                response = {
+                    "ok": True,
+                    "errorCode": None,
+                    "message": "Success",
+                    "data": audio_base64,
+                    "cost": cost_estimated,
+                    "fromCache": False,
+                    "requestId": request_id,
+                    "provider": speech_service.get_provider_name(),
+                    "latency": round(latency, 3)
+                }
+                self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
+                
+            except Exception as synthesis_error:
+                # 记录错误
+                latency = time.time() - start_time
+                cost_book.commit(cost=0.0, latency=latency, from_cache=False, error=True)
+                
+                # 错误分类
+                error_code = "SYNTHESIS_ERROR"
+                error_message = str(synthesis_error)
+                status_code = 500
+                
+                if "401" in error_message or "Unauthorized" in error_message:
+                    error_code = "AUTHENTICATION_ERROR"
+                    error_message = "Invalid API credentials. Please check your TTS configuration."
+                    status_code = 401
+                elif "403" in error_message or "Forbidden" in error_message:
+                    error_code = "PERMISSION_ERROR"
+                    error_message = "Access denied. Please check your API permissions."
+                    status_code = 403
+                elif "429" in error_message or "rate limit" in error_message.lower():
+                    error_code = "RATE_LIMIT_ERROR"
+                    error_message = "Rate limit exceeded. Please try again later."
+                    status_code = 429
+                elif "timeout" in error_message.lower():
+                    error_code = "TIMEOUT_ERROR"
+                    error_message = "Request timeout. Please try again."
+                    status_code = 408
+                
+                cors_headers = _get_cors_headers(
+                    request_id=request_id, 
+                    cost_estimated=cost_estimated, 
+                    mode=mode
+                )
+                self.send_response(status_code)
+                for key, value in cors_headers.items():
+                    self.send_header(key, value)
+                self.end_headers()
+                
+                response = {
+                    "ok": False,
+                    "errorCode": error_code,
+                    "message": error_message,
+                    "cost": cost_estimated,
+                    "fromCache": False,
+                    "requestId": request_id,
+                    "provider": speech_service.get_provider_name(),
+                    "latency": round(latency, 3)
+                }
+                self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
+                
         except Exception as e:
+            # 全局错误处理
+            latency = time.time() - start_time
+            
             try:
-                cors_headers = _get_cors_headers()
+                cost_book = get_cost_book()
+                cost_book.commit(cost=0.0, latency=latency, from_cache=False, error=True)
+            except:
+                pass
+            
+            try:
+                cors_headers = _get_cors_headers(request_id=request_id, mode=mode)
             except:
                 cors_headers = {"Content-Type": "application/json"}
             
@@ -239,4 +427,14 @@ class handler(BaseHTTPRequestHandler):
             for key, value in cors_headers.items():
                 self.send_header(key, value)
             self.end_headers()
-            self.wfile.write(json.dumps({"error": str(e)}, ensure_ascii=False).encode('utf-8'))
+            
+            response = {
+                "ok": False,
+                "errorCode": "INTERNAL_ERROR",
+                "message": f"Internal server error: {str(e)}",
+                "cost": cost_estimated,
+                "fromCache": from_cache,
+                "requestId": request_id,
+                "latency": round(latency, 3)
+            }
+            self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
