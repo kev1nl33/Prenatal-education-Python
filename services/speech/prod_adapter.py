@@ -201,7 +201,7 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                 "reqid": f"prenatal_{int(time.time() * 1000)}",
                 "text": text,
                 "text_type": "plain",
-                "operation": "submit"
+                "operation": "query"
             }
         }
         
