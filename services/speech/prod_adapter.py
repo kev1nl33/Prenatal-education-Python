@@ -43,13 +43,13 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
     
     def _get_voice_config(self, voice_type: str, quality: str) -> Dict[str, Any]:
         """获取音色配置"""
-        # 音色映射
+        # 音色映射 - 使用官方文档中的正确格式
         voice_mapping = {
-            "default": "BV421_streaming",
-            "female": "BV421_streaming",
-            "male": "BV422_streaming",
-            "child": "BV423_streaming",
-            "elderly": "BV424_streaming"
+            "default": "zh_female_xinlingjitang_moon_bigtts",
+            "female": "zh_female_xinlingjitang_moon_bigtts",
+            "male": "zh_male_jingqiangdaxiaosheng_moon_bigtts",
+            "child": "zh_female_qingxin",
+            "elderly": "zh_male_chunhou"
         }
         
         # 质量配置
@@ -158,7 +158,7 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
         # 获取音色配置
         voice_config = self._get_voice_config(voice_type, quality)
         
-        # 构建请求负载
+        # 构建请求负载 - 按照官方文档格式
         payload = {
             "app": {
                 "appid": self.app_id,
@@ -168,12 +168,18 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
             "user": {
                 "uid": "prenatal_education_user"
             },
-            "audio": voice_config,
+            "audio": {
+                "voice_type": voice_config["voice_type"],
+                "encoding": voice_config["encoding"],
+                "speed_ratio": voice_config["speed_ratio"],
+                "volume_ratio": voice_config["volume_ratio"],
+                "pitch_ratio": voice_config["pitch_ratio"]
+            },
             "request": {
                 "reqid": f"prenatal_{int(time.time() * 1000)}",
                 "text": text,
                 "text_type": "plain",
-                "operation": "query"
+                "operation": "submit"
             }
         }
         
