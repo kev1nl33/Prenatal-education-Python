@@ -517,16 +517,23 @@ function loadHistoryItem(index) {
   // 设置内容类型
   selectContentCardByType(type);
 
+  // 同步到状态，确保后续可直接生成语音
+  state.lastContent = text;
+
   // 显示内容
   el.contentText.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
   el.resultSection.style.display = 'block';
 
-  // 如果有音频，设置音频
+  // 如果有音频，设置音频；否则隐藏播放器并清空上一次的音频状态
   if (item.audioBlob) {
     state.lastAudioBlob = item.audioBlob;
     const audioUrl = URL.createObjectURL(item.audioBlob);
     el.audioElement.src = audioUrl;
     el.audioPlayer.style.display = 'block';
+  } else {
+    state.lastAudioBlob = null;
+    el.audioElement.removeAttribute('src');
+    el.audioPlayer.style.display = 'none';
   }
 
   // 关闭模态框
