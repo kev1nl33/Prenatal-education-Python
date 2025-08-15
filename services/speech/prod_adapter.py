@@ -110,32 +110,79 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                     # 尝试解析JSON响应
                     try:
                         json_response = json.loads(response_data.decode("utf-8"))
-                        print(f"[PROD_ADAPTER DEBUG] JSON response structure: {list(json_response.keys())}")
+                        print(f"[PROD_ADAPTER DEBUG] Full JSON response: {json.dumps(json_response, indent=2, ensure_ascii=False)}")
                         
-                        # 如果是JSON格式，检查是否包含音频数据
-                        if "data" in json_response:
-                            if isinstance(json_response["data"], str):
-                                # 直接的base64字符串
-                                audio_data = base64.b64decode(json_response["data"])
-                                print(f"[PROD_ADAPTER DEBUG] Decoded audio data size: {len(audio_data)} bytes")
-                                return audio_data
-                            elif isinstance(json_response["data"], dict) and "audio" in json_response["data"]:
-                                # 嵌套结构
-                                audio_data = base64.b64decode(json_response["data"]["audio"])
-                                print(f"[PROD_ADAPTER DEBUG] Decoded nested audio data size: {len(audio_data)} bytes")
-                                return audio_data
+                        # 检查响应是否成功
+                        if "code" in json_response:
+                            if json_response["code"] != 0:
+                                error_msg = json_response.get("message", "Unknown error")
+                                print(f"[PROD_ADAPTER DEBUG] API returned error code {json_response['code']}: {error_msg}")
+                                raise Exception(f"Volcengine API error ({json_response['code']}): {error_msg}")
+                        
+                        # 查找音频数据 - 支持多种可能的响应格式
+                        audio_base64 = None
+                        
+                        # 格式1: data字段直接包含base64字符串
+                        if "data" in json_response and isinstance(json_response["data"], str):
+                            audio_base64 = json_response["data"]
+                            print(f"[PROD_ADAPTER DEBUG] Found audio in data field (string)")
+                        
+                        # 格式2: data.audio字段
+                        elif "data" in json_response and isinstance(json_response["data"], dict):
+                            if "audio" in json_response["data"]:
+                                audio_base64 = json_response["data"]["audio"]
+                                print(f"[PROD_ADAPTER DEBUG] Found audio in data.audio field")
+                            elif json_response["data"]:
+                                # data字典中的第一个值可能是音频
+                                first_value = next(iter(json_response["data"].values()), None)
+                                if isinstance(first_value, str) and len(first_value) > 100:  # 假设音频base64至少100字符
+                                    audio_base64 = first_value
+                                    print(f"[PROD_ADAPTER DEBUG] Found audio as first value in data dict")
+                        
+                        # 格式3: 直接在audio字段
                         elif "audio" in json_response:
-                            # 直接在audio字段
-                            audio_data = base64.b64decode(json_response["audio"])
-                            print(f"[PROD_ADAPTER DEBUG] Decoded direct audio data size: {len(audio_data)} bytes")
-                            return audio_data
+                            audio_base64 = json_response["audio"]
+                            print(f"[PROD_ADAPTER DEBUG] Found audio in audio field")
+                        
+                        # 格式4: result字段（某些API版本）
+                        elif "result" in json_response:
+                            result = json_response["result"]
+                            if isinstance(result, str):
+                                audio_base64 = result
+                                print(f"[PROD_ADAPTER DEBUG] Found audio in result field")
+                            elif isinstance(result, dict) and "audio" in result:
+                                audio_base64 = result["audio"]
+                                print(f"[PROD_ADAPTER DEBUG] Found audio in result.audio field")
+                        
+                        # 如果找到了音频数据，解码并返回
+                        if audio_base64:
+                            try:
+                                audio_data = base64.b64decode(audio_base64)
+                                print(f"[PROD_ADAPTER DEBUG] Successfully decoded audio data size: {len(audio_data)} bytes")
+                                
+                                # 简单验证：音频数据应该至少有一定大小
+                                if len(audio_data) < 100:
+                                    print(f"[PROD_ADAPTER DEBUG] Warning: Audio data seems too small ({len(audio_data)} bytes)")
+                                
+                                return audio_data
+                            except Exception as decode_error:
+                                print(f"[PROD_ADAPTER DEBUG] Failed to decode base64 audio: {decode_error}")
+                                raise Exception(f"Failed to decode audio data: {decode_error}")
                         else:
-                            print(f"[PROD_ADAPTER DEBUG] No audio data found in response. Full response: {json.dumps(json_response, indent=2, ensure_ascii=False)}")
-                            raise ValueError("No audio data found in response")
-                    except json.JSONDecodeError:
-                        # 如果不是JSON，假设是直接的音频数据
-                        print(f"[PROD_ADAPTER DEBUG] Non-JSON response, treating as raw audio data")
-                        return response_data
+                            print(f"[PROD_ADAPTER DEBUG] No audio data found in any expected field")
+                            print(f"[PROD_ADAPTER DEBUG] Available fields: {list(json_response.keys())}")
+                            raise Exception("No audio data found in API response")
+                            
+                    except json.JSONDecodeError as json_error:
+                        print(f"[PROD_ADAPTER DEBUG] JSON decode error: {json_error}")
+                        print(f"[PROD_ADAPTER DEBUG] Raw response (first 500 chars): {response_data[:500]}")
+                        
+                        # 如果不是JSON，可能是直接的音频数据（不太可能但要处理）
+                        if len(response_data) > 100:  # 假设音频至少100字节
+                            print(f"[PROD_ADAPTER DEBUG] Treating as raw audio data")
+                            return response_data
+                        else:
+                            raise Exception(f"Invalid JSON response: {json_error}")
                         
             except urllib.error.HTTPError as e:
                 last_exception = e
