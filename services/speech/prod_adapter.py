@@ -90,29 +90,51 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                     }
                 )
                 
+                # Debug: 请求信息
+                print(f"[PROD_ADAPTER DEBUG] API URL: {self.api_url}")
+                print(f"[PROD_ADAPTER DEBUG] Request payload: {json.dumps(payload, indent=2, ensure_ascii=False)}")
+                print(f"[PROD_ADAPTER DEBUG] Request headers: {dict(req.headers)}")
+                print(f"[PROD_ADAPTER DEBUG] App ID: {self.app_id}")
+                print(f"[PROD_ADAPTER DEBUG] Access token (first 10 chars): {self.access_token[:10]}...")
+                
                 # 发送请求
                 ctx = self._build_ssl_context()
                 with urllib.request.urlopen(req, timeout=self.timeout, context=ctx) as response:
                     response_data = response.read()
                     
+                    # Debug: 响应信息
+                    print(f"[PROD_ADAPTER DEBUG] Response status: {response.getcode()}")
+                    print(f"[PROD_ADAPTER DEBUG] Response headers: {dict(response.headers)}")
+                    print(f"[PROD_ADAPTER DEBUG] Response size: {len(response_data)} bytes")
+                    
                     # 尝试解析JSON响应
                     try:
                         json_response = json.loads(response_data.decode("utf-8"))
+                        print(f"[PROD_ADAPTER DEBUG] JSON response structure: {list(json_response.keys())}")
+                        
                         # 如果是JSON格式，检查是否包含音频数据
                         if "data" in json_response:
                             if isinstance(json_response["data"], str):
                                 # 直接的base64字符串
-                                return base64.b64decode(json_response["data"])
+                                audio_data = base64.b64decode(json_response["data"])
+                                print(f"[PROD_ADAPTER DEBUG] Decoded audio data size: {len(audio_data)} bytes")
+                                return audio_data
                             elif isinstance(json_response["data"], dict) and "audio" in json_response["data"]:
                                 # 嵌套结构
-                                return base64.b64decode(json_response["data"]["audio"])
+                                audio_data = base64.b64decode(json_response["data"]["audio"])
+                                print(f"[PROD_ADAPTER DEBUG] Decoded nested audio data size: {len(audio_data)} bytes")
+                                return audio_data
                         elif "audio" in json_response:
                             # 直接在audio字段
-                            return base64.b64decode(json_response["audio"])
+                            audio_data = base64.b64decode(json_response["audio"])
+                            print(f"[PROD_ADAPTER DEBUG] Decoded direct audio data size: {len(audio_data)} bytes")
+                            return audio_data
                         else:
+                            print(f"[PROD_ADAPTER DEBUG] No audio data found in response. Full response: {json.dumps(json_response, indent=2, ensure_ascii=False)}")
                             raise ValueError("No audio data found in response")
                     except json.JSONDecodeError:
                         # 如果不是JSON，假设是直接的音频数据
+                        print(f"[PROD_ADAPTER DEBUG] Non-JSON response, treating as raw audio data")
                         return response_data
                         
             except urllib.error.HTTPError as e:

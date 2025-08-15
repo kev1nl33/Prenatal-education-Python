@@ -131,7 +131,7 @@ function generateMockContent(prompt) {
       '小雨点滴答，\n敲打着窗台，\n就像在弹琴，\n奏响爱的旋律。\n\n妈妈的怀抱，\n是最温暖的港湾，\n宝宝在这里，\n快乐每一天。\n\n爱的种子发芽，\n在心田里生长，\n未来的日子，\n充满阳光。'
     ],
     'wisdom': [
-      '亲爱的宝宝，妈妈想告诉你关于成长的秘密。每个人都像一颗种子，需要阳光、雨露和爱的滋养才能茁壮成长。在你还没有来到这个世界之前，妈妈就在为你准备最好的土壤——那就是一个充满爱的家庭。记住，无论遇到什么困难，爱总是最强大的力量。',
+      '亲爱的宝宝，妈妈想告诉你关于成长的秘密。每个人都像一颗种子，需要阳光、雨露和爱的nourishment才能茁壮成长。在你还没有来到这个世界之前，妈妈就在为你准备最好的土壤——那就是一个充满爱的家庭。记住，无论遇到什么困难，爱总是最强大的力量。',
       '宝宝，妈妈想和你分享关于友谊的智慧。真正的朋友就像星星，即使在最黑暗的夜晚也会为你闪闪发光。学会善待他人，用真诚的心去交朋友，你会发现这个世界充满了美好的人。记住，给予比接受更快乐，分享会让快乐加倍。',
       '我的小宝贝，妈妈想告诉你关于勇气的故事。勇气不是不害怕，而是即使害怕也要去做正确的事情。每个人心中都有一个小小的勇士，当你遇到挑战时，记得唤醒他。相信自己，你比想象中更强大、更勇敢。'
     ],
@@ -146,7 +146,7 @@ function generateMockContent(prompt) {
       '亲爱的小天使，你知道吗？你的到来让我们的生活变得如此美好。每当感受到你在妈妈肚子里的小动作，我们的心就充满了喜悦和感动。你是我们爱情的结晶，是我们希望的延续，是我们未来最美好的期待。'
     ],
     'learning': [
-      '宝宝，让我们一起认识颜色的世界吧！红色像苹果一样鲜艳，黄色像太阳一样温暖，蓝色像天空一样广阔，绿色像草地一样清新。每种颜色都有自己的魅力，就像每个人都有自己的特点。当你睁开眼睛看世界时，会发现生活是如此多彩。',
+      '宝宝，我们一起认识颜色的世界吧！红色像苹果一样鲜艳，黄色像太阳一样温暖，蓝色像天空一样广阔，绿色像草地一样清新。每种颜色都有自己的魅力，就像每个人都自己的特点。当你睁开眼睛看世界时，会发现生活是如此多彩。',
       '数字是很有趣的朋友呢！1像一根蜡烛直直地站着，2像一只小鸭子在水中游泳，3像两个小耳朵在听故事，4像一面小旗子在风中飘扬，5像一个小钩子可以挂东西。宝宝，学会数数后，你就能数出妈妈给你的吻有多少个了！',
       '形状的世界真奇妙！圆形像太阳、像月亮、像妈妈温柔的脸庞；方形像积木、像窗户、像爸爸结实的肩膀；三角形像小山、像帽子、像小鸟的嘴巴。每个形状都有自己的故事，等你长大了，我们一起去发现更多有趣的形状吧！'
     ]
@@ -250,11 +250,6 @@ async function ttsSynthesize(payload) {
     const headers = {
       'Content-Type': 'application/json'
     };
-
-    // 添加认证头（如果配置了访问令牌）
-    if (state.accessToken) {
-      headers['X-Auth-Token'] = state.accessToken;
-    }
 
     const response = await fetch(`${API_BASE}/api/tts`, {
       method: 'POST',
@@ -659,20 +654,8 @@ el.generateAudio.addEventListener('click', async() => {
   try {
     const payload = {
       text: state.lastContent,
-      appid: state.ttsAppId,
-      access_token: state.accessToken, // 传给后端
-      voice_type: state.voiceType || 'zh_male_shenyeboke_moon_bigtts',
-      encoding: 'mp3',
-      speed_ratio: 1.0,
-      volume_ratio: 1.0,
-      pitch_ratio: 1.0,
-      uid: 'test_user_001',
-      cluster: 'volcano_tts',
-      reqid: Date.now().toString(),
-      text_type: 'plain',
-      operation: 'query',
-      with_frontend: 1,
-      frontend_type: 'unitTson'
+      voice_type: state.voiceType || 'default',
+      quality: 'draft'
     };
     const data = await ttsSynthesize(payload);
 
@@ -692,7 +675,9 @@ el.generateAudio.addEventListener('click', async() => {
     }
 
     const audioBytes = base64ToBytes(audioBase64);
-    const blob = new Blob([audioBytes], { type: 'audio/mpeg' });
+    // Determine correct MIME type from bytes or response info
+    const mimeType = data.encoding ? (data.encoding === 'wav' ? 'audio/wav' : 'audio/mpeg') : detectAudioMimeType(audioBytes);
+    const blob = new Blob([audioBytes], { type: mimeType });
     state.lastAudioBlob = blob;
     const url = URL.createObjectURL(blob);
     el.audioElement.src = url;
@@ -924,34 +909,54 @@ function base64ToBytes(base64) {
   return bytes;
 }
 
+// 检测音频数据的MIME类型
+function detectAudioMimeType(audioBytes) {
+  if (!audioBytes || audioBytes.length < 12) {
+    return 'audio/mpeg'; // 默认回退
+  }
+
+  // MP3 文件检测（帧同步或 ID3 头）
+  if (audioBytes[0] === 0xFF && (audioBytes[1] & 0xE0) === 0xE0) {
+    return 'audio/mpeg';
+  }
+  if (audioBytes[0] === 0x49 && audioBytes[1] === 0x44 && audioBytes[2] === 0x33) {
+    return 'audio/mpeg'; // ID3 tagged MP3
+  }
+
+  // WAV 文件检测 RIFF....WAVE
+  if (audioBytes[0] === 0x52 && audioBytes[1] === 0x49 &&
+      audioBytes[2] === 0x46 && audioBytes[3] === 0x46 &&
+      audioBytes[8] === 0x57 && audioBytes[9] === 0x41 &&
+      audioBytes[10] === 0x56 && audioBytes[11] === 0x45) {
+    return 'audio/wav';
+  }
+
+  // OGG 文件检测 OggS
+  if (audioBytes[0] === 0x4F && audioBytes[1] === 0x67 &&
+      audioBytes[2] === 0x67 && audioBytes[3] === 0x53) {
+    return 'audio/ogg';
+  }
+
+  // M4A/AAC/MP4 容器 ftyp
+  if (audioBytes[4] === 0x66 && audioBytes[5] === 0x74 &&
+      audioBytes[6] === 0x79 && audioBytes[7] === 0x70) {
+    return 'audio/mp4';
+  }
+
+  return 'audio/mpeg'; // 默认回退
+}
+
 init();
 
 
 
 // 为历史记录项生成语音
 async function generateAudioForHistoryItem(text) {
-  if (!state.ttsAppId || !state.accessToken) {
-    alert('请先在配置区域保存TTS设置');
-    return;
-  }
-
   try {
     const payload = {
       text: text,
-      appid: state.ttsAppId,
-      access_token: state.accessToken,
-      voice_type: state.voiceType || 'BV421_streaming',
-      encoding: 'mp3',
-      speed_ratio: 1.0,
-      volume_ratio: 1.0,
-      pitch_ratio: 1.0,
-      uid: 'test_user_001',
-      cluster: 'volcano_tts',
-      reqid: Date.now().toString(),
-      text_type: 'plain',
-      operation: 'query',
-      with_frontend: 1,
-      frontend_type: 'unitTson'
+      voice_type: state.voiceType || 'default',
+      quality: 'draft'
     };
 
     const data = await ttsSynthesize(payload);
@@ -969,7 +974,9 @@ async function generateAudioForHistoryItem(text) {
     }
 
     const audioBytes = base64ToBytes(audioBase64);
-    const blob = new Blob([audioBytes], { type: 'audio/mpeg' });
+    // Determine correct MIME type from bytes or response info
+    const mimeType = data.encoding ? (data.encoding === 'wav' ? 'audio/wav' : 'audio/mpeg') : detectAudioMimeType(audioBytes);
+    const blob = new Blob([audioBytes], { type: mimeType });
     state.lastAudioBlob = blob;
     const url = URL.createObjectURL(blob);
     el.audioElement.src = url;

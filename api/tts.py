@@ -358,7 +358,7 @@ class handler(BaseHTTPRequestHandler):
             
             # 调用语音合成服务
             try:
-                audio_data = speech_service.synthesize(text)
+                audio_data = speech_service.synthesize(text, voice_type=voice_type, quality=quality)
                 
                 # 缓存结果
                 cache.set(text, audio_data, voice_type, params)
