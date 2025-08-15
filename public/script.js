@@ -1,11 +1,17 @@
-const API_BASE = ""; // 同源，不要写域名
+const API_BASE = ''; // 同源，不要写域名
 
 // 简易本地存储封装
 const storage = {
   get(key, def) {
-    try { return JSON.parse(localStorage.getItem(key)) ?? def; } catch { return def; }
+    try {
+      return JSON.parse(localStorage.getItem(key)) ?? def;
+    } catch {
+      return def;
+    }
   },
-  set(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+  set(key, val) {
+    localStorage.setItem(key, JSON.stringify(val));
+  }
 };
 
 // 历史记录管理
@@ -15,10 +21,10 @@ const HISTORY_KEY = 'prenatal_history';
 
 // 显示成功提示
 function showSuccess(message) {
-    const successDiv = document.createElement('div');
-    successDiv.className = 'success-message';
-    successDiv.textContent = message;
-    successDiv.style.cssText = `
+  const successDiv = document.createElement('div');
+  successDiv.className = 'success-message';
+  successDiv.textContent = message;
+  successDiv.style.cssText = `
         position: fixed;
         top: 20px;
         right: 20px;
@@ -32,24 +38,24 @@ function showSuccess(message) {
         word-wrap: break-word;
         animation: slideIn 0.3s ease-out;
     `;
-    
-    document.body.appendChild(successDiv);
-    
-    // 3秒后自动移除
-    setTimeout(() => {
-        if (successDiv.parentNode) {
-            successDiv.parentNode.removeChild(successDiv);
-        }
-    }, 3000);
+
+  document.body.appendChild(successDiv);
+
+  // 3秒后自动移除
+  setTimeout(() => {
+    if (successDiv.parentNode) {
+      successDiv.parentNode.removeChild(successDiv);
+    }
+  }, 3000);
 }
 
 // 显示错误提示
 function showError(message) {
-    // 创建错误提示元素
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'error-message';
-    errorDiv.textContent = message;
-    errorDiv.style.cssText = `
+  // 创建错误提示元素
+  const errorDiv = document.createElement('div');
+  errorDiv.className = 'error-message';
+  errorDiv.textContent = message;
+  errorDiv.style.cssText = `
         position: fixed;
         top: 20px;
         right: 20px;
@@ -63,222 +69,222 @@ function showError(message) {
         word-wrap: break-word;
         animation: slideIn 0.3s ease-out;
     `;
-    
-    // 添加动画样式
-    if (!document.querySelector('#error-animation-style')) {
-        const style = document.createElement('style');
-        style.id = 'error-animation-style';
-        style.textContent = `
+
+  // 添加动画样式
+  if (!document.querySelector('#error-animation-style')) {
+    const style = document.createElement('style');
+    style.id = 'error-animation-style';
+    style.textContent = `
             @keyframes slideIn {
                 from { transform: translateX(100%); opacity: 0; }
                 to { transform: translateX(0); opacity: 1; }
             }
         `;
-        document.head.appendChild(style);
+    document.head.appendChild(style);
+  }
+
+  document.body.appendChild(errorDiv);
+
+  // 3秒后自动移除
+  setTimeout(() => {
+    if (errorDiv.parentNode) {
+      errorDiv.parentNode.removeChild(errorDiv);
     }
-    
-    document.body.appendChild(errorDiv);
-    
-    // 3秒后自动移除
-    setTimeout(() => {
-        if (errorDiv.parentNode) {
-            errorDiv.parentNode.removeChild(errorDiv);
-        }
-    }, 3000);
+  }, 3000);
 }
 
 // 生成模拟响应（测试模式）
 function generateMockResponse(prompt) {
-    return new Promise((resolve) => {
-        // 模拟API延迟
-        setTimeout(() => {
-            const mockContent = generateMockContent(prompt);
-            resolve({
-                choices: [{
-                    message: {
-                        content: mockContent
-                    }
-                }],
-                usage: {
-                    prompt_tokens: 50,
-                    completion_tokens: 100,
-                    total_tokens: 150
-                }
-            });
-        }, 1000 + Math.random() * 1000); // 1-2秒随机延迟
-    });
+  return new Promise((resolve) => {
+    // 模拟API延迟
+    setTimeout(() => {
+      const mockContent = generateMockContent(prompt);
+      resolve({
+        choices: [{
+          message: {
+            content: mockContent
+          }
+        }],
+        usage: {
+          prompt_tokens: 50,
+          completion_tokens: 100,
+          total_tokens: 150
+        }
+      });
+    }, 1000 + Math.random() * 1000); // 1-2秒随机延迟
+  });
 }
 
 // 生成模拟内容
 function generateMockContent(prompt) {
-    const contentType = el.contentType.value;
-    
-    const templates = {
-        'story': [
-            '从前有一个小兔子，它住在森林深处的一个温暖的洞穴里。每天早晨，小兔子都会跳出洞穴，在草地上快乐地蹦跳。它最喜欢的事情就是收集五颜六色的花朵，然后把它们编成美丽的花环。有一天，小兔子发现了一朵特别的七彩花，这朵花会在夜晚发出温柔的光芒，照亮整个森林。',
-            '在一个遥远的王国里，住着一位善良的公主。她有着金色的长发和温柔的笑容。公主最喜欢在花园里照顾各种各样的花朵，她相信每一朵花都有自己的故事。每当夜晚来临，公主会轻抚着花瓣，倾听它们诉说着关于爱与希望的美丽传说。',
-            '小熊维尼今天要去蜂蜜树那里探险。他背着小背包，里面装着他最喜欢的蜂蜜罐。一路上，他遇到了许多朋友：跳跳虎、小猪、小驴屹耳。大家一起在阳光下嬉戏，分享着甜蜜的蜂蜜和温暖的友谊。'
-        ],
-        'poetry': [
-            '小星星眨眼睛，\n月亮船儿轻轻摇，\n宝宝睡在摇篮里，\n梦里开满小花朵。\n\n风儿轻轻吹，\n云朵慢慢飘，\n妈妈的爱如春雨，\n滋润着小心苗。\n\n夜空中的星星，\n为宝宝唱摇篮曲，\n甜甜的梦境里，\n有彩虹和小天使。',
-            '彩虹桥弯弯，\n连接天和地，\n小鸟飞过去，\n带来好消息。\n\n花儿对我笑，\n草儿向我招，\n阳光暖洋洋，\n心情真美好。\n\n蝴蝶翩翩舞，\n蜜蜂嗡嗡唱，\n大自然的怀抱，\n充满了希望。',
-            '小雨点滴答，\n敲打着窗台，\n就像在弹琴，\n奏响爱的旋律。\n\n妈妈的怀抱，\n是最温暖的港湾，\n宝宝在这里，\n快乐每一天。\n\n爱的种子发芽，\n在心田里生长，\n未来的日子，\n充满阳光。'
-        ],
-        'wisdom': [
-            '亲爱的宝宝，妈妈想告诉你关于成长的秘密。每个人都像一颗种子，需要阳光、雨露和爱的滋养才能茁壮成长。在你还没有来到这个世界之前，妈妈就在为你准备最好的土壤——那就是一个充满爱的家庭。记住，无论遇到什么困难，爱总是最强大的力量。',
-            '宝宝，妈妈想和你分享关于友谊的智慧。真正的朋友就像星星，即使在最黑暗的夜晚也会为你闪闪发光。学会善待他人，用真诚的心去交朋友，你会发现这个世界充满了美好的人。记住，给予比接受更快乐，分享会让快乐加倍。',
-            '我的小宝贝，妈妈想告诉你关于勇气的故事。勇气不是不害怕，而是即使害怕也要去做正确的事情。每个人心中都有一个小小的勇士，当你遇到挑战时，记得唤醒他。相信自己，你比想象中更强大、更勇敢。'
-        ],
-        'nature': [
-            '清晨的第一缕阳光透过窗帘洒进房间，就像妈妈温柔的手轻抚着你的脸颊。外面的世界正在苏醒：小鸟在枝头欢快地歌唱，花朵在晨露中绽放，微风轻柔地摇摆着绿叶。这是大自然给我们的美好礼物，宝宝，你将会看到这个世界所有的美丽。',
-            '春天来了，万物复苏。嫩绿的小草从土地里探出头来，樱花树上开满了粉色的花朵，就像天空中飘落的云彩。蝴蝶在花丛中翩翩起舞，蜜蜂忙碌地采集花蜜。这个季节充满了生机和希望，就像你即将到来的生命一样珍贵。',
-            '夜晚的星空是如此美丽，无数颗星星在天空中闪烁，就像钻石撒在深蓝色的丝绸上。月亮像一艘银色的小船，载着美好的梦想在云海中航行。宝宝，当你看到这片星空时，要记得每一颗星星都在为你祝福。'
-        ],
-        'emotion': [
-            '我的小宝贝，妈妈想告诉你，你是我生命中最珍贵的礼物。从知道你存在的那一刻起，我的心就被无尽的爱填满了。每一天，我都在期待着与你的相遇，想象着你的小手、你的笑容、你的第一声啼哭。你还没有出生，但你已经是我整个世界的中心。',
-            '宝宝，爸爸妈妈为你准备了一个充满爱的家。我们会用最温柔的声音为你唱摇篮曲，用最温暖的怀抱给你安全感，用最真挚的爱陪伴你成长。无论你将来成为什么样的人，我们都会无条件地爱你、支持你、保护你。',
-            '亲爱的小天使，你知道吗？你的到来让我们的生活变得如此美好。每当感受到你在妈妈肚子里的小动作，我们的心就充满了喜悦和感动。你是我们爱情的结晶，是我们希望的延续，是我们未来最美好的期待。'
-        ],
-        'learning': [
-            '宝宝，让我们一起认识颜色的世界吧！红色像苹果一样鲜艳，黄色像太阳一样温暖，蓝色像天空一样广阔，绿色像草地一样清新。每种颜色都有自己的魅力，就像每个人都有自己的特点。当你睁开眼睛看世界时，会发现生活是如此多彩。',
-            '数字是很有趣的朋友呢！1像一根蜡烛直直地站着，2像一只小鸭子在水中游泳，3像两个小耳朵在听故事，4像一面小旗子在风中飘扬，5像一个小钩子可以挂东西。宝宝，学会数数后，你就能数出妈妈给你的吻有多少个了！',
-            '形状的世界真奇妙！圆形像太阳、像月亮、像妈妈温柔的脸庞；方形像积木、像窗户、像爸爸结实的肩膀；三角形像小山、像帽子、像小鸟的嘴巴。每个形状都有自己的故事，等你长大了，我们一起去发现更多有趣的形状吧！'
-        ]
-    };
-    
-    // 根据当前选择的内容类型获取模板
-    const selectedTemplates = templates[contentType] || templates['story'];
-    
-    // 随机选择一个模板
-    const randomIndex = Math.floor(Math.random() * selectedTemplates.length);
-    return selectedTemplates[randomIndex];
+  const contentType = el.contentType.value;
+
+  const templates = {
+    'story': [
+      '从前有一个小兔子，它住在森林深处的一个温暖的洞穴里。每天早晨，小兔子都会跳出洞穴，在草地上快乐地蹦跳。它最喜欢的事情就是收集五颜六色的花朵，然后把它们编成美丽的花环。有一天，小兔子发现了一朵特别的七彩花，这朵花会在夜晚发出温柔的光芒，照亮整个森林。',
+      '在一个遥远的王国里，住着一位善良的公主。她有着金色的长发和温柔的笑容。公主最喜欢在花园里照顾各种各样的花朵，她相信每一朵花都有自己的故事。每当夜晚来临，公主会轻抚着花瓣，倾听它们诉说着关于爱与希望的美丽传说。',
+      '小熊维尼今天要去蜂蜜树那里探险。他背着小背包，里面装着他最喜欢的蜂蜜罐。一路上，他遇到了许多朋友：跳跳虎、小猪、小驴屹耳。大家一起在阳光下嬉戏，分享着甜蜜的蜂蜜和温暖的友谊。'
+    ],
+    'poetry': [
+      '小星星眨眼睛，\n月亮船儿轻轻摇，\n宝宝睡在摇篮里，\n梦里开满小花朵。\n\n风儿轻轻吹，\n云朵慢慢飘，\n妈妈的爱如春雨，\n滋润着小心苗。\n\n夜空中的星星，\n为宝宝唱摇篮曲，\n甜甜的梦境里，\n有彩虹和小天使。',
+      '彩虹桥弯弯，\n连接天和地，\n小鸟飞过去，\n带来好消息。\n\n花儿对我笑，\n草儿向我招，\n阳光暖洋洋，\n心情真美好。\n\n蝴蝶翩翩舞，\n蜜蜂嗡嗡唱，\n大自然的怀抱，\n充满了希望。',
+      '小雨点滴答，\n敲打着窗台，\n就像在弹琴，\n奏响爱的旋律。\n\n妈妈的怀抱，\n是最温暖的港湾，\n宝宝在这里，\n快乐每一天。\n\n爱的种子发芽，\n在心田里生长，\n未来的日子，\n充满阳光。'
+    ],
+    'wisdom': [
+      '亲爱的宝宝，妈妈想告诉你关于成长的秘密。每个人都像一颗种子，需要阳光、雨露和爱的滋养才能茁壮成长。在你还没有来到这个世界之前，妈妈就在为你准备最好的土壤——那就是一个充满爱的家庭。记住，无论遇到什么困难，爱总是最强大的力量。',
+      '宝宝，妈妈想和你分享关于友谊的智慧。真正的朋友就像星星，即使在最黑暗的夜晚也会为你闪闪发光。学会善待他人，用真诚的心去交朋友，你会发现这个世界充满了美好的人。记住，给予比接受更快乐，分享会让快乐加倍。',
+      '我的小宝贝，妈妈想告诉你关于勇气的故事。勇气不是不害怕，而是即使害怕也要去做正确的事情。每个人心中都有一个小小的勇士，当你遇到挑战时，记得唤醒他。相信自己，你比想象中更强大、更勇敢。'
+    ],
+    'nature': [
+      '清晨的第一缕阳光透过窗帘洒进房间，就像妈妈温柔的手轻抚着你的脸颊。外面的世界正在苏醒：小鸟在枝头欢快地歌唱，花朵在晨露中绽放，微风轻柔地摇摆着绿叶。这是大自然给我们的美好礼物，宝宝，你将会看到这个世界所有的美丽。',
+      '春天来了，万物复苏。嫩绿的小草从土地里探出头来，樱花树上开满了粉色的花朵，就像天空中飘落的云彩。蝴蝶在花丛中翩翩起舞，蜜蜂忙碌地采集花蜜。这个季节充满了生机和希望，就像你即将到来的生命一样珍贵。',
+      '夜晚的星空是如此美丽，无数颗星星在天空中闪烁，就像钻石撒在深蓝色的丝绸上。月亮像一艘银色的小船，载着美好的梦想在云海中航行。宝宝，当你看到这片星空时，要记得每一颗星星都在为你祝福。'
+    ],
+    'emotion': [
+      '我的小宝贝，妈妈想告诉你，你是我生命中最珍贵的礼物。从知道你存在的那一刻起，我的心就被无尽的爱填满了。每一天，我都在期待着与你的相遇，想象着你的小手、你的笑容、你的第一声啼哭。你还没有出生，但你已经是我整个世界的中心。',
+      '宝宝，爸爸妈妈为你准备了一个充满爱的家。我们会用最温柔的声音为你唱摇篮曲，用最温暖的怀抱给你安全感，用最真挚的爱陪伴你成长。无论你将来成为什么样的人，我们都会无条件地爱你、支持你、保护你。',
+      '亲爱的小天使，你知道吗？你的到来让我们的生活变得如此美好。每当感受到你在妈妈肚子里的小动作，我们的心就充满了喜悦和感动。你是我们爱情的结晶，是我们希望的延续，是我们未来最美好的期待。'
+    ],
+    'learning': [
+      '宝宝，让我们一起认识颜色的世界吧！红色像苹果一样鲜艳，黄色像太阳一样温暖，蓝色像天空一样广阔，绿色像草地一样清新。每种颜色都有自己的魅力，就像每个人都有自己的特点。当你睁开眼睛看世界时，会发现生活是如此多彩。',
+      '数字是很有趣的朋友呢！1像一根蜡烛直直地站着，2像一只小鸭子在水中游泳，3像两个小耳朵在听故事，4像一面小旗子在风中飘扬，5像一个小钩子可以挂东西。宝宝，学会数数后，你就能数出妈妈给你的吻有多少个了！',
+      '形状的世界真奇妙！圆形像太阳、像月亮、像妈妈温柔的脸庞；方形像积木、像窗户、像爸爸结实的肩膀；三角形像小山、像帽子、像小鸟的嘴巴。每个形状都有自己的故事，等你长大了，我们一起去发现更多有趣的形状吧！'
+    ]
+  };
+
+  // 根据当前选择的内容类型获取模板
+  const selectedTemplates = templates[contentType] || templates['story'];
+
+  // 随机选择一个模板
+  const randomIndex = Math.floor(Math.random() * selectedTemplates.length);
+  return selectedTemplates[randomIndex];
 }
 
 // 模拟TTS合成（测试模式）
 function generateMockTTS() {
-    return new Promise((resolve) => {
-        // 模拟TTS延迟
-        setTimeout(() => {
-            // 生成一个简单的音频blob（静音）
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const sampleRate = audioContext.sampleRate;
-            const duration = 3; // 3秒
-            const numSamples = sampleRate * duration;
-            const audioBuffer = audioContext.createBuffer(1, numSamples, sampleRate);
-            
-            // 生成简单的音调
-            const channelData = audioBuffer.getChannelData(0);
-            for (let i = 0; i < numSamples; i++) {
-                channelData[i] = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 0.1; // 440Hz音调，低音量
-            }
-            
-            // 转换为WAV格式
-            const wavBlob = audioBufferToWav(audioBuffer);
-            resolve(wavBlob);
-        }, 2000 + Math.random() * 1000); // 2-3秒随机延迟
-    });
+  return new Promise((resolve) => {
+    // 模拟TTS延迟
+    setTimeout(() => {
+      // 生成一个简单的音频blob（静音）
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const sampleRate = audioContext.sampleRate;
+      const duration = 3; // 3秒
+      const numSamples = sampleRate * duration;
+      const audioBuffer = audioContext.createBuffer(1, numSamples, sampleRate);
+
+      // 生成简单的音调
+      const channelData = audioBuffer.getChannelData(0);
+      for (let i = 0; i < numSamples; i++) {
+        channelData[i] = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 0.1; // 440Hz音调，低音量
+      }
+
+      // 转换为WAV格式
+      const wavBlob = audioBufferToWav(audioBuffer);
+      resolve(wavBlob);
+    }, 2000 + Math.random() * 1000); // 2-3秒随机延迟
+  });
 }
 
 // Ark文本生成API封装
 async function arkGenerate(prompt, model) {
-    try {
-        // 检查是否为测试模式
-        if (state.testMode) {
-            return generateMockResponse(prompt);
-        }
-        
-        const headers = {
-            'Content-Type': 'application/json'
-        };
-        
-        // 添加认证头（如果配置了API密钥）
-        if (state.textApiKey) {
-            headers['X-Auth-Token'] = state.textApiKey;
-        }
-        
-        const response = await fetch(`${API_BASE}/api/ark`, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify({ prompt, model })
-        });
-        
-        const data = await response.json();
-        
-        // 添加调试信息
-        console.log('API Response:', data);
-        
-        if (!response.ok) {
-            throw new Error(data.error || `HTTP ${response.status}`);
-        }
-        
-        if (data.error) {
-            throw new Error(data.error);
-        }
-        
-        // 验证响应格式
-        if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
-            throw new Error('API响应格式错误：缺少choices数组');
-        }
-        
-        if (!data.choices[0].message || !data.choices[0].message.content) {
-            throw new Error('API响应格式错误：缺少message.content');
-        }
-        
-        return data;
-    } catch (error) {
-        console.error('arkGenerate error:', error);
-        showError(`文本生成失败: ${error.message}`);
-        throw error;
+  try {
+    // 检查是否为测试模式
+    if (state.testMode) {
+      return generateMockResponse(prompt);
     }
+
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+
+    // 添加认证头（如果配置了API密钥）
+    if (state.textApiKey) {
+      headers['X-Auth-Token'] = state.textApiKey;
+    }
+
+    const response = await fetch(`${API_BASE}/api/ark`, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({ prompt, model })
+    });
+
+    const data = await response.json();
+
+    // 添加调试信息
+    console.log('API Response:', data);
+
+    if (!response.ok) {
+      throw new Error(data.error || `HTTP ${response.status}`);
+    }
+
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    // 验证响应格式
+    if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
+      throw new Error('API响应格式错误：缺少choices数组');
+    }
+
+    if (!data.choices[0].message || !data.choices[0].message.content) {
+      throw new Error('API响应格式错误：缺少message.content');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('arkGenerate error:', error);
+    showError(`文本生成失败: ${error.message}`);
+    throw error;
+  }
 }
 
 // TTS语音合成API封装
 async function ttsSynthesize(payload) {
-    try {
-        // 检查是否为测试模式
-        if (state.testMode) {
-            console.warn('运行在测试模式，将生成模拟音频');
-            return await generateMockTTS();
-        }
-        
-        const headers = {
-            'Content-Type': 'application/json'
-        };
-        
-        // 添加认证头（如果配置了访问令牌）
-        if (state.accessToken) {
-            headers['X-Auth-Token'] = state.accessToken;
-        }
-        
-        const response = await fetch(`${API_BASE}/api/tts`, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify(payload)
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.error || `HTTP ${response.status}`);
-        }
-        
-        if (data.error) {
-            throw new Error(data.error);
-        }
-        
-        // 检查运行模式并显示警告
-        if (data.mode && data.mode !== 'prod') {
-            console.warn(`TTS运行在${data.mode}模式，可能生成占位音频`);
-            if (data.warning) {
-                console.warn(`警告: ${data.warning}`);
-            }
-        }
-        
-        return data;
-    } catch (error) {
-        showError(`语音合成失败: ${error.message}`);
-        throw error;
+  try {
+    // 检查是否为测试模式
+    if (state.testMode) {
+      console.warn('运行在测试模式，将生成模拟音频');
+      return await generateMockTTS();
     }
+
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+
+    // 添加认证头（如果配置了访问令牌）
+    if (state.accessToken) {
+      headers['X-Auth-Token'] = state.accessToken;
+    }
+
+    const response = await fetch(`${API_BASE}/api/tts`, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || `HTTP ${response.status}`);
+    }
+
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    // 检查运行模式并显示警告
+    if (data.mode && data.mode !== 'prod') {
+      console.warn(`TTS运行在${data.mode}模式，可能生成占位音频`);
+      if (data.warning) {
+        console.warn(`警告: ${data.warning}`);
+      }
+    }
+
+    return data;
+  } catch (error) {
+    showError(`语音合成失败: ${error.message}`);
+    throw error;
+  }
 }
 
 // 全局状态
@@ -291,7 +297,7 @@ const state = {
   testMode: storage.get('ve_test_mode', false),
   lastContent: '',
   lastAudioBlob: null,
-  history: storage.get('ve_history', []),
+  history: storage.get('ve_history', [])
 };
 
 // DOM 元素
@@ -325,7 +331,7 @@ const el = {
   historyModal: document.getElementById('historyModal'),
   closeHistoryModal: document.getElementById('closeHistoryModal'),
   closeHistoryModalBtn: document.getElementById('closeHistoryModalBtn'),
-  clearAllHistory: document.getElementById('clearAllHistory'),
+  clearAllHistory: document.getElementById('clearAllHistory')
 };
 
 // 模态框控制函数
@@ -351,18 +357,18 @@ function init() {
   el.ttsAppId.value = state.ttsAppId;
   el.accessToken.value = state.accessToken;
   el.testMode.checked = state.testMode;
-  
+
   // 初始化内容卡片选择
   initContentCards();
-  
+
   // 初始化语音选择器（下拉框）
   initVoiceSelector();
-  
+
   // 初始化历史记录功能
   initHistoryModal();
-  
+
   renderHistory();
-  
+
   // 首次使用时自动弹出设置模态框
   if (isFirstTimeUser()) {
     showSettingsModal();
@@ -376,7 +382,7 @@ function initContentCards() {
   if (defaultCard) {
     defaultCard.classList.add('selected');
   }
-  
+
   // 为每个卡片添加点击事件
   el.contentCards.forEach(card => {
     card.addEventListener('click', () => {
@@ -391,14 +397,14 @@ function selectContentCard(selectedCard) {
   el.contentCards.forEach(card => {
     card.classList.remove('selected');
   });
-  
+
   // 添加选中状态到当前卡片
   selectedCard.classList.add('selected');
-  
+
   // 更新隐藏的input值
   const contentType = selectedCard.getAttribute('data-type');
   el.contentType.value = contentType;
-  
+
   // 可选：添加选择反馈
   selectedCard.style.transform = 'scale(0.98)';
   setTimeout(() => {
@@ -410,12 +416,12 @@ function selectContentCard(selectedCard) {
 function initVoiceSelector() {
   // 设置当前选中的语音
   el.voiceSelector.value = state.voiceType || 'zh_male_shenyeboke_moon_bigtts';
-  
+
   // 添加change事件监听器
   el.voiceSelector.addEventListener('change', (e) => {
     const selectedVoice = e.target.value;
     state.voiceType = selectedVoice;
-    
+
     // 保存到localStorage
     storage.set('ve_voice_type', selectedVoice);
   });
@@ -425,18 +431,18 @@ function initVoiceSelector() {
 function initHistoryModal() {
   // 打开历史记录模态框
   el.openHistoryBtn.addEventListener('click', showHistoryModal);
-  
+
   // 关闭历史记录模态框
   el.closeHistoryModal.addEventListener('click', hideHistoryModal);
   el.closeHistoryModalBtn.addEventListener('click', hideHistoryModal);
-  
+
   // 点击模态框背景关闭
   el.historyModal.addEventListener('click', (e) => {
     if (e.target === el.historyModal) {
       hideHistoryModal();
     }
   });
-  
+
   // 清空所有历史记录
   el.clearAllHistory.addEventListener('click', () => {
     if (confirm('确定要清空所有历史记录吗？此操作不可撤销。')) {
@@ -461,20 +467,20 @@ function hideHistoryModal() {
 // 在模态框中渲染历史记录
 function renderHistoryInModal() {
   const historyList = el.historyList;
-  
+
   if (state.history.length === 0) {
     historyList.innerHTML = '<p class="empty-state">暂无历史记录</p>';
     return;
   }
-  
+
   historyList.innerHTML = state.history.map((item, index) => `
     <div class="history-item" data-index="${index}">
       <div class="history-content">
         <div class="history-meta">
-          <span class="history-type">${getContentTypeLabel(item.contentType)}</span>
+          <span class="history-type">${getContentTypeLabel(item.contentType || 'unknown')}</span>
           <span class="history-date">${new Date(item.timestamp).toLocaleString()}</span>
         </div>
-        <div class="history-text">${escapeHtml(item.content.substring(0, 100))}${item.content.length > 100 ? '...' : ''}</div>
+        <div class="history-text">${escapeHtml((item.content || '').substring(0, 100))}${(item.content || '').length > 100 ? '...' : ''}</div>
       </div>
       <div class="history-actions">
         <button class="btn btn-sm btn-outline" onclick="loadHistoryItem(${index})">加载</button>
@@ -500,15 +506,17 @@ function getContentTypeLabel(type) {
 // 加载历史记录项
 function loadHistoryItem(index) {
   const item = state.history[index];
-  if (!item) return;
-  
+  if (!item) {
+    return;
+  }
+
   // 设置内容类型
-  selectContentCardByType(item.contentType);
-  
+  selectContentCardByType(item.contentType || 'story');
+
   // 显示内容
-  el.contentText.innerHTML = escapeHtml(item.content).replace(/\n/g, '<br>');
+  el.contentText.innerHTML = escapeHtml(item.content || '').replace(/\n/g, '<br>');
   el.resultSection.style.display = 'block';
-  
+
   // 如果有音频，设置音频
   if (item.audioBlob) {
     state.lastAudioBlob = item.audioBlob;
@@ -516,13 +524,13 @@ function loadHistoryItem(index) {
     el.audioElement.src = audioUrl;
     el.audioPlayer.style.display = 'block';
   }
-  
+
   // 关闭模态框
   hideHistoryModal();
-  
+
   // 滚动到结果区域
   el.resultSection.scrollIntoView({ behavior: 'smooth' });
-  
+
   showSuccess('历史记录已加载');
 }
 
@@ -588,13 +596,13 @@ el.saveConfig.addEventListener('click', () => {
   // 语音类型现在从voiceSelector获取
   state.voiceType = el.voiceSelector.value;
   state.testMode = el.testMode.checked;
-  
+
   // 在非测试模式下验证必要的配置
   if (!state.testMode && !state.textApiKey) {
     showError('请输入文本API密钥或启用测试模式');
     return;
   }
-  
+
   // 保存到localStorage
   storage.set('ve_text_api_key', state.textApiKey);
   storage.set('ve_model_endpoint', state.modelEndpoint);
@@ -602,14 +610,14 @@ el.saveConfig.addEventListener('click', () => {
   storage.set('ve_access_token', state.accessToken);
   storage.set('ve_voice_type', state.voiceType);
   storage.set('ve_test_mode', state.testMode);
-  
+
   const modeText = state.testMode ? '（测试模式已启用）' : '';
   showSuccess(`配置已保存${modeText}`);
   hideSettingsModal(); // 保存后关闭模态框
 });
 
 // 生成胎教内容
-el.generateContent.addEventListener('click', async () => {
+el.generateContent.addEventListener('click', async() => {
   if (!state.testMode && !state.textApiKey) {
     if (confirm('未配置文本API密钥，是否打开设置或启用测试模式？')) {
       showSettingsModal();
@@ -631,7 +639,7 @@ el.generateContent.addEventListener('click', async () => {
       mood: el.mood.value,
       duration: el.duration.value,
       text,
-      time: Date.now(),
+      time: Date.now()
     });
   } catch (e) {
     console.error(e);
@@ -642,7 +650,7 @@ el.generateContent.addEventListener('click', async () => {
 });
 
 // 生成语音
-el.generateAudio.addEventListener('click', async () => {
+el.generateAudio.addEventListener('click', async() => {
   if (!state.lastContent) {
     alert('请先生成文本内容');
     return;
@@ -654,20 +662,20 @@ el.generateAudio.addEventListener('click', async () => {
       appid: state.ttsAppId,
       access_token: state.accessToken, // 传给后端
       voice_type: state.voiceType || 'zh_male_shenyeboke_moon_bigtts',
-      encoding: "mp3",
+      encoding: 'mp3',
       speed_ratio: 1.0,
       volume_ratio: 1.0,
       pitch_ratio: 1.0,
-      uid: "test_user_001",
-      cluster: "volcano_tts",
+      uid: 'test_user_001',
+      cluster: 'volcano_tts',
       reqid: Date.now().toString(),
-      text_type: "plain",
-      operation: "query",
+      text_type: 'plain',
+      operation: 'query',
       with_frontend: 1,
-      frontend_type: "unitTson"
+      frontend_type: 'unitTson'
     };
     const data = await ttsSynthesize(payload);
-    
+
     // 根据火山引擎TTS文档，音频数据位于 data 字段中，且已经是base64编码
     let audioBase64;
     if (data.data && typeof data.data === 'string') {
@@ -682,14 +690,14 @@ el.generateAudio.addEventListener('click', async () => {
     } else {
       throw new Error('TTS返回格式异常：未找到音频数据');
     }
-    
+
     const audioBytes = base64ToBytes(audioBase64);
     const blob = new Blob([audioBytes], { type: 'audio/mpeg' });
     state.lastAudioBlob = blob;
     const url = URL.createObjectURL(blob);
     el.audioElement.src = url;
     el.audioPlayer.style.display = 'flex';
-    
+
     showSuccess('语音生成成功！');
   } catch (e) {
     console.error(e);
@@ -701,7 +709,9 @@ el.generateAudio.addEventListener('click', async () => {
 
 // 下载音频
 el.downloadAudio.addEventListener('click', () => {
-  if (!state.lastAudioBlob) return;
+  if (!state.lastAudioBlob) {
+    return;
+  }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(state.lastAudioBlob);
   a.download = `胎教音频_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.mp3`;
@@ -718,13 +728,13 @@ function buildPrompt() {
     happy: '愉悦开心',
     peaceful: '安详宁静',
     warm: '温暖关爱',
-    energetic: '活力充沛',
+    energetic: '活力充沛'
   };
 
   const durationMap = {
     short: '约400-600字',
     medium: '约800-1200字',
-    long: '约1500-2000字',
+    long: '约1500-2000字'
   };
 
   const typeMap = {
@@ -732,7 +742,7 @@ function buildPrompt() {
     music: '设计一段音乐胎教引导词，包含呼吸放松、轻柔引导，配合背景音乐想象',
     poetry: '创作一组温柔的现代诗歌或古诗改编，适合柔声朗读',
     nature: '撰写一段自然声景的引导词，如森林、海边、清晨，帮助放松身心',
-    wisdom: '提供一段科学温暖的育儿智慧，以亲切语气，避免焦虑和过度建议',
+    wisdom: '提供一段科学温暖的育儿智慧，以亲切语气，避免焦虑和过度建议'
   };
 
   return `请以温柔、积极、安定的语气，面向孕妈妈，生成${typeMap[type]}。整体基调为“${moodMap[mood]}”，篇幅${durationMap[duration]}。要求：\n- 用词轻柔、避免刺激、避免负面暗示\n- 建议分为自然小段，便于朗读\n- 适当加入呼吸/放松/想象引导\n- 面向中文语境读者，使用简体中文`;
@@ -748,12 +758,16 @@ function setLoading(button, loading) {
   if (loading) {
     button.disabled = true;
     text.style.display = 'none';
-    if (!spinner) return;
+    if (!spinner) {
+      return;
+    }
     spinner.style.display = 'inline-block';
   } else {
     button.disabled = false;
     text.style.display = 'inline';
-    if (!spinner) return;
+    if (!spinner) {
+      return;
+    }
     spinner.style.display = 'none';
   }
 }
@@ -763,12 +777,14 @@ function addHistory(item) {
   const MAX_HISTORY = 50;
   const history = storage.get('ve_history', []);
   history.unshift(item);
-  while (history.length > MAX_HISTORY) history.pop();
+  while (history.length > MAX_HISTORY) {
+    history.pop();
+  }
   storage.set('ve_history', history);
-  
+
   // 同步更新state.history
   state.history = history;
-  
+
   renderHistory();
 }
 
@@ -792,12 +808,12 @@ function renderHistory() {
         <span class="badge">${escapeHtml(item.duration)}</span>
         <span class="time">${new Date(item.time).toLocaleString()}</span>
       </div>
-      <div class="history-text">${escapeHtml(item.text)}</div>
+      <div class="history-text">${escapeHtml(item.text || '')}</div>
       <div class="history-actions">
-        <button class="btn btn-secondary btn-sm reload-text" data-text="${escapeHtml(item.text)}">
+        <button class="btn btn-secondary btn-sm reload-text" data-text="${escapeHtml(item.text || '')}">
           <span class="btn-text">载入文本</span>
         </button>
-        <button class="btn btn-primary btn-sm generate-audio" data-text="${escapeHtml(item.text)}">
+        <button class="btn btn-primary btn-sm generate-audio" data-text="${escapeHtml(item.text || '')}">
           <span class="btn-text">生成语音</span>
           <span class="loading-spinner" style="display: none;">⏳</span>
         </button>
@@ -805,7 +821,7 @@ function renderHistory() {
     `;
     el.historyList.appendChild(div);
   }
-  
+
   // 为历史记录按钮添加事件监听器
   el.historyList.querySelectorAll('.reload-text').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -817,9 +833,9 @@ function renderHistory() {
       showSuccess('文本已载入，可以直接生成语音');
     });
   });
-  
+
   el.historyList.querySelectorAll('.generate-audio').forEach(btn => {
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', async() => {
       const text = btn.getAttribute('data-text');
       setLoading(btn, true);
       try {
@@ -840,16 +856,7 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
-// 生成静音占位音频
-async function synthSilence(seconds = 2) {
-  const sampleRate = 44100;
-  const numChannels = 2;
-  const length = seconds * sampleRate;
-  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  const buffer = audioContext.createBuffer(numChannels, length, sampleRate);
-  const audioData = audioBufferToWav(buffer);
-  return new Blob([audioData], { type: 'audio/wav' });
-}
+// 生成静音占位音频（已移除，未使用）
 
 function audioBufferToWav(buffer) {
   const numOfChan = buffer.numberOfChannels;
@@ -876,7 +883,9 @@ function audioBufferToWav(buffer) {
   setUint32(0x61746164); // "data"
   setUint32(length - pos - 4); // chunk length
 
-  for (let i = 0; i < buffer.numberOfChannels; i++) channels.push(buffer.getChannelData(i));
+  for (let i = 0; i < buffer.numberOfChannels; i++) {
+    channels.push(buffer.getChannelData(i));
+  }
 
   while (pos < length) {
     for (let i = 0; i < numOfChan; i++) { // interleave channels
@@ -899,8 +908,8 @@ function audioBufferToWav(buffer) {
 }
 
 function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
 }
@@ -925,28 +934,28 @@ async function generateAudioForHistoryItem(text) {
     alert('请先在配置区域保存TTS设置');
     return;
   }
-  
+
   try {
     const payload = {
       text: text,
       appid: state.ttsAppId,
       access_token: state.accessToken,
       voice_type: state.voiceType || 'BV421_streaming',
-      encoding: "mp3",
+      encoding: 'mp3',
       speed_ratio: 1.0,
       volume_ratio: 1.0,
       pitch_ratio: 1.0,
-      uid: "test_user_001",
-      cluster: "volcano_tts",
+      uid: 'test_user_001',
+      cluster: 'volcano_tts',
       reqid: Date.now().toString(),
-      text_type: "plain",
-      operation: "query",
+      text_type: 'plain',
+      operation: 'query',
       with_frontend: 1,
-      frontend_type: "unitTson"
+      frontend_type: 'unitTson'
     };
-    
+
     const data = await ttsSynthesize(payload);
-    
+
     // 根据火山引擎TTS文档，音频数据位于 data 字段中
     let audioBase64;
     if (data.data && typeof data.data === 'string') {
@@ -958,19 +967,19 @@ async function generateAudioForHistoryItem(text) {
     } else {
       throw new Error('TTS返回格式异常：未找到音频数据');
     }
-    
+
     const audioBytes = base64ToBytes(audioBase64);
     const blob = new Blob([audioBytes], { type: 'audio/mpeg' });
     state.lastAudioBlob = blob;
     const url = URL.createObjectURL(blob);
     el.audioElement.src = url;
     el.audioPlayer.style.display = 'flex';
-    
+
     // 将历史记录的文本设置为当前内容
     state.lastContent = text;
     el.contentText.textContent = text;
     el.resultSection.style.display = 'block';
-    
+
     showSuccess('历史记录语音生成成功！');
   } catch (e) {
     console.error(e);
