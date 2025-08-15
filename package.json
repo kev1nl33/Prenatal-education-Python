@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Prenatal education application with Python API backend",
   "engines": {
-    "node": "20.x"
+    "node": "18.x"
   },
   "scripts": {
     "dev": "vercel dev",

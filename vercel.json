@@ -1,21 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "functions": {
-    "api/*.py": {
-      "runtime": "python3.12"
-    }
-  },
   "rewrites": [
-    { "source": "/", "destination": "/public/index.html" }
-  ],
-  "env": {
-    "MODE": "sandbox",
-    "PYTHONPATH": "."
-  },
-  "build": {
-    "env": {
-      "MODE": "sandbox"
-    }
-  }
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }

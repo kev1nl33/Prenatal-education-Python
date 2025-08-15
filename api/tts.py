@@ -209,31 +209,16 @@ class handler(BaseHTTPRequestHandler):
             
             # 获取语音服务实例
             try:
-                # 环境检测和配置验证
-                current_mode = get_current_mode()
-                
-                # 生产环境配置检查
-                if current_mode == 'prod':
-                    missing_vars = []
-                    if not os.environ.get('TTS_APP_ID'):
-                        missing_vars.append('TTS_APP_ID')
-                    if not os.environ.get('TTS_ACCESS_TOKEN'):
-                        missing_vars.append('TTS_ACCESS_TOKEN')
-                    
-                    if missing_vars:
-                        raise ValueError(f"生产环境缺少必要的环境变量: {', '.join(missing_vars)}。请在Vercel项目设置中配置这些环境变量。")
-                
                 speech_service = get_speech_service()
                 
                 # 检查模式并添加警告
+                current_mode = get_current_mode()
                 if current_mode in ['local', 'sandbox']:
                     print(f"WARNING: TTS service running in {current_mode} mode. Audio may be placeholder/silent.")
                     if current_mode == 'local':
                         print("INFO: Local mode generates placeholder audio files. Set MODE=prod for real TTS.")
                     elif current_mode == 'sandbox':
                         print("INFO: Sandbox mode generates test audio. Set MODE=prod for real TTS.")
-                elif current_mode == 'prod':
-                    print("INFO: Production mode with real TTS service.")
                         
             except ValueError as e:
                 cors_headers = _get_cors_headers(request_id=request_id, mode=mode)
@@ -244,27 +229,17 @@ class handler(BaseHTTPRequestHandler):
                 
                 # 提供更友好的错误信息
                 error_message = str(e)
-                suggestion = ""
-                
                 if "TTS_APP_ID" in error_message or "TTS_ACCESS_TOKEN" in error_message:
-                    if current_mode == 'prod':
-                        error_message = "生产环境TTS配置错误：缺少必要的API密钥。请在Vercel项目设置中配置TTS_APP_ID和TTS_ACCESS_TOKEN环境变量。"
-                        suggestion = "解决方案：1. 登录Vercel控制台 2. 进入项目设置 3. 在Environment Variables中添加TTS_APP_ID和TTS_ACCESS_TOKEN 4. 重新部署项目"
-                    else:
-                        error_message = "TTS服务配置错误：缺少必要的API密钥。请检查环境变量配置或切换到本地模式。"
-                        suggestion = "建议：在本地开发环境中，请确保.env文件中设置了MODE=local"
+                    error_message = "TTS服务配置错误：缺少必要的API密钥。请检查环境变量配置或切换到本地模式。"
                 elif "Unsupported mode" in error_message:
                     error_message = "不支持的运行模式。请检查MODE环境变量设置。"
-                    suggestion = "建议：设置MODE=local（本地开发）或MODE=prod（生产环境）"
                 
                 response = {
                     "ok": False,
                     "errorCode": "SERVICE_CONFIG_ERROR",
                     "message": error_message,
                     "requestId": request_id,
-                    "suggestion": suggestion,
-                    "mode": current_mode,
-                    "environment": "production" if current_mode == 'prod' else "development"
+                    "suggestion": "建议：在本地开发环境中，请确保.env文件中设置了MODE=local"
                 }
                 self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
                 return
