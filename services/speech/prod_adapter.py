@@ -25,7 +25,7 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
         
         # 重试配置
         self.max_retries = int(os.environ.get('TTS_MAX_RETRIES', '2'))
-        self.timeout = int(os.environ.get('TTS_TIMEOUT', '10'))
+        self.timeout = int(os.environ.get('TTS_TIMEOUT', '30'))  # 增加到30秒
         
         if not self.app_id or not self.access_token:
             raise ValueError("TTS_APP_ID and TTS_ACCESS_TOKEN must be set in environment variables")
@@ -207,10 +207,41 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                     else:
                         raise Exception(f"TTS service error ({e.code}): {error_body}")
                         
+            except urllib.error.URLError as e:
+                last_exception = e
+                # URLError 通常是网络连接问题或超时
+                if "timeout" in str(e).lower() or "timed out" in str(e).lower():
+                    if attempt < self.max_retries:
+                        delay = (2 ** attempt) + random.uniform(0, 1)
+                        print(f"[PROD_ADAPTER DEBUG] Request timeout on attempt {attempt + 1}, retrying in {delay:.1f}s...")
+                        time.sleep(delay)
+                        continue
+                    else:
+                        # 明确标识为超时错误，便于上层映射
+                        raise Exception("Request timeout: TTS synthesis took too long")
+                else:
+                    if attempt < self.max_retries:
+                        delay = (2 ** attempt) + random.uniform(0, 1)
+                        print(f"[PROD_ADAPTER DEBUG] Network error on attempt {attempt + 1}: {str(e)}, retrying in {delay:.1f}s...")
+                        time.sleep(delay)
+                        continue
+                    else:
+                        raise Exception(f"Network error: {str(e)}")
+                        
             except Exception as e:
                 last_exception = e
-                if attempt < self.max_retries:
+                # 检查是否是超时异常
+                if "timeout" in str(e).lower() or "timed out" in str(e).lower():
+                    if attempt < self.max_retries:
+                        delay = (2 ** attempt) + random.uniform(0, 1)
+                        print(f"[PROD_ADAPTER DEBUG] General timeout on attempt {attempt + 1}, retrying in {delay:.1f}s...")
+                        time.sleep(delay)
+                        continue
+                    else:
+                        raise Exception("Request timeout: TTS synthesis took too long")
+                elif attempt < self.max_retries:
                     delay = (2 ** attempt) + random.uniform(0, 1)
+                    print(f"[PROD_ADAPTER DEBUG] General error on attempt {attempt + 1}: {str(e)}, retrying in {delay:.1f}s...")
                     time.sleep(delay)
                     continue
                 else:
@@ -248,7 +279,8 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                 "reqid": f"prenatal_{int(time.time() * 1000)}",
                 "text": text,
                 "text_type": "plain",
-                "operation": "query"
+                "operation": "submit",
+                "enable_subtitle": False
             }
         }
         
