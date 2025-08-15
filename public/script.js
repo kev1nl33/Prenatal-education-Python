@@ -468,21 +468,27 @@ function renderHistoryInModal() {
     return;
   }
 
-  historyList.innerHTML = state.history.map((item, index) => `
+  historyList.innerHTML = state.history.map((item, index) => {
+    const type = item.contentType || item.type || 'unknown';
+    const timestamp = item.timestamp || item.time || Date.now();
+    const text = (item.content != null ? item.content : item.text) || '';
+    const preview = text.substring(0, 100);
+    return `
     <div class="history-item" data-index="${index}">
       <div class="history-content">
         <div class="history-meta">
-          <span class="history-type">${getContentTypeLabel(item.contentType || 'unknown')}</span>
-          <span class="history-date">${new Date(item.timestamp).toLocaleString()}</span>
+          <span class="history-type">${getContentTypeLabel(type)}</span>
+          <span class="history-date">${new Date(timestamp).toLocaleString()}</span>
         </div>
-        <div class="history-text">${escapeHtml((item.content || '').substring(0, 100))}${(item.content || '').length > 100 ? '...' : ''}</div>
+        <div class="history-text">${escapeHtml(preview)}${text.length > 100 ? '...' : ''}</div>
       </div>
       <div class="history-actions">
         <button class="btn btn-sm btn-outline" onclick="loadHistoryItem(${index})">加载</button>
         <button class="btn btn-sm btn-danger" onclick="deleteHistoryItem(${index})">删除</button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 // 获取内容类型标签
@@ -505,11 +511,14 @@ function loadHistoryItem(index) {
     return;
   }
 
+  const type = item.contentType || item.type || 'story';
+  const text = (item.content != null ? item.content : item.text) || '';
+
   // 设置内容类型
-  selectContentCardByType(item.contentType || 'story');
+  selectContentCardByType(type);
 
   // 显示内容
-  el.contentText.innerHTML = escapeHtml(item.content || '').replace(/\n/g, '<br>');
+  el.contentText.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
   el.resultSection.style.display = 'block';
 
   // 如果有音频，设置音频
