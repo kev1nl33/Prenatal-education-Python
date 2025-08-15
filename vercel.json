@@ -3,20 +3,19 @@
   "framework": null,
   "functions": {
     "api/*.py": {
-      "runtime": "python3.9"
+      "runtime": "python3.12"
     }
   },
+  "rewrites": [
+    { "source": "/", "destination": "/public/index.html" }
+  ],
   "env": {
-    "MODE": "prod",
+    "MODE": "sandbox",
     "PYTHONPATH": "."
   },
   "build": {
     "env": {
-      "MODE": "prod"
+      "MODE": "sandbox"
     }
-  },
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  }
 }
