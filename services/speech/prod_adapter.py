@@ -86,7 +86,7 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                     data=req_data,
                     headers={
                         "Content-Type": "application/json",
-                        "Authorization": f"Bearer {self.access_token}"
+                        "Authorization": f"Bearer;{self.access_token}"
                     }
                 )
                 
