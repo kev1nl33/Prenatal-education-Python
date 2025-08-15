@@ -25,7 +25,7 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
         
         # 重试配置
         self.max_retries = int(os.environ.get('TTS_MAX_RETRIES', '2'))
-        self.timeout = int(os.environ.get('TTS_TIMEOUT', '30'))  # 增加到30秒
+        self.timeout = int(os.environ.get('TTS_TIMEOUT', '60'))  # 增加到60秒
         
         if not self.app_id or not self.access_token:
             raise ValueError("TTS_APP_ID and TTS_ACCESS_TOKEN must be set in environment variables")
