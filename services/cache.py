@@ -11,13 +11,22 @@ class TTSCache:
     
     def __init__(self, cache_dir: Optional[str] = None):
         if cache_dir is None:
-            # 优先使用Vercel缓存目录，否则使用临时目录
-            if os.path.exists('/.vercel'):
-                cache_dir = '/.vercel/cache/tts'
-            elif os.path.exists('/tmp'):
-                cache_dir = '/tmp/tts'
-            else:
-                cache_dir = './cache/tts'
+            # 在无状态平台上优先使用 /tmp，其它路径仅在可写时使用
+            candidates = [
+                '/tmp/tts',
+                '/.vercel/cache/tts',  # 仅当其可写时使用
+                './cache/tts'
+            ]
+            chosen = None
+            for path in candidates:
+                try:
+                    os.makedirs(path, exist_ok=True)
+                    if os.access(path, os.W_OK):
+                        chosen = path
+                        break
+                except Exception:
+                    continue
+            cache_dir = chosen or './cache/tts'
         
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)

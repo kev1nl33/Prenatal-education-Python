@@ -27,7 +27,13 @@ def get_speech_service(mode: Optional[str] = None) -> SpeechSynthesizer:
         if mode is None:
             # 根据环境自动检测模式
             if os.getenv('VERCEL') or os.getenv('VERCEL_ENV'):
-                mode = 'prod'  # Vercel环境默认使用生产模式
+                # 在 Vercel 环境中，如果没有设置必要的 TTS 配置，使用本地模式
+                tts_app_id = os.getenv('TTS_APP_ID', '')
+                tts_access_token = os.getenv('TTS_ACCESS_TOKEN', '')
+                if not tts_app_id or not tts_access_token or tts_app_id == 'your_tts_app_id_here' or tts_access_token == 'your_tts_access_token_here':
+                    mode = 'local'  # 使用本地模式避免配置错误
+                else:
+                    mode = 'prod'  # 有效配置时使用生产模式
             elif os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('RENDER'):
                 mode = 'prod'  # 其他云平台默认使用生产模式
             else:
@@ -41,7 +47,12 @@ def get_speech_service(mode: Optional[str] = None) -> SpeechSynthesizer:
     elif mode == 'sandbox':
         return SandboxSpeechAdapter()
     elif mode == 'prod':
-        return ProductionSpeechAdapter()
+        try:
+            return ProductionSpeechAdapter()
+        except ValueError as e:
+            # 如果生产模式配置有问题，自动降级到本地模式
+            print(f"WARNING: Production TTS config error, falling back to local mode: {e}")
+            return LocalSpeechAdapter()
     else:
         raise ValueError(f"Unsupported mode: {mode}. Supported modes: local, sandbox, prod")
 
@@ -52,7 +63,13 @@ def get_current_mode() -> str:
     if mode is None:
         # 根据环境自动检测模式
         if os.getenv('VERCEL') or os.getenv('VERCEL_ENV'):
-            mode = 'prod'  # Vercel环境默认使用生产模式
+            # 在 Vercel 环境中，检查 TTS 配置
+            tts_app_id = os.getenv('TTS_APP_ID', '')
+            tts_access_token = os.getenv('TTS_ACCESS_TOKEN', '')
+            if not tts_app_id or not tts_access_token or tts_app_id == 'your_tts_app_id_here' or tts_access_token == 'your_tts_access_token_here':
+                mode = 'local'  # 使用本地模式避免配置错误
+            else:
+                mode = 'prod'  # 有效配置时使用生产模式
         elif os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('RENDER'):
             mode = 'prod'  # 其他云平台默认使用生产模式
         else:

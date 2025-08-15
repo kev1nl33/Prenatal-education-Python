@@ -13,7 +13,23 @@ class LocalSpeechAdapter(SpeechSynthesizer):
     
     def __init__(self):
         self.fixtures_dir = os.path.join(os.path.dirname(__file__), '..', 'fixtures')
-        self.cache_dir = os.path.join('/tmp', 'tts') if os.path.exists('/tmp') else os.path.join('.', '.cache', 'tts')
+        
+        # 安全选择缓存目录，优先 /tmp
+        cache_candidates = [
+            os.path.join('/tmp', 'tts'),
+            os.path.join('.', '.cache', 'tts')
+        ]
+        chosen_cache = None
+        for cache_path in cache_candidates:
+            try:
+                os.makedirs(cache_path, exist_ok=True)
+                if os.access(cache_path, os.W_OK):
+                    chosen_cache = cache_path
+                    break
+            except Exception:
+                continue
+        
+        self.cache_dir = chosen_cache or os.path.join('.', '.cache', 'tts')
         os.makedirs(self.cache_dir, exist_ok=True)
         os.makedirs(self.fixtures_dir, exist_ok=True)
         

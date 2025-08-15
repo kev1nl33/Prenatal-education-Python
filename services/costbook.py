@@ -1,7 +1,7 @@
 import os
 import json
 import time
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import Dict, Any, Optional
 
 
@@ -10,12 +10,24 @@ class CostBook:
     
     def __init__(self, storage_path: Optional[str] = None):
         if storage_path is None:
-            # 优先使用Vercel缓存目录，否则使用临时目录
-            if os.path.exists('/.vercel'):
-                storage_path = '/.vercel/cache/costbook.json'
-                os.makedirs('/.vercel/cache', exist_ok=True)
-            else:
-                storage_path = '/tmp/costbook.json' if os.path.exists('/tmp') else './costbook.json'
+            # 选择一个可写的路径，优先 /tmp（Vercel 等无状态平台唯一可写目录）
+            candidates = [
+                '/tmp/costbook.json',
+                '/.vercel/cache/costbook.json',  # 仅当其可写时使用
+                './costbook.json'
+            ]
+            chosen = None
+            for path in candidates:
+                parent = os.path.dirname(path) or '.'
+                try:
+                    os.makedirs(parent, exist_ok=True)
+                    # 检查目录是否可写
+                    if os.access(parent, os.W_OK):
+                        chosen = path
+                        break
+                except Exception:
+                    continue
+            storage_path = chosen or './costbook.json'
         
         self.storage_path = storage_path
         self.data = self._load_data()
@@ -160,7 +172,7 @@ class CostBook:
         
         # 删除过期的日统计
         keys_to_remove = []
-        for date_key in self.data["daily_stats"]:
+        for date_key in list(self.data["daily_stats"].keys()):
             if date_key < cutoff_timestamp:
                 keys_to_remove.append(date_key)
         
