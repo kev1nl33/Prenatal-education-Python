@@ -2,7 +2,7 @@
 import os
 import sys
 import json
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import HTTPServer, SimpleHTTPRequestHandler, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import importlib.util
 
@@ -139,6 +139,8 @@ def run_server(port=8000):
         print("\nShutting down server...")
         httpd.shutdown()
 
+# Export handler for Vercel Python Runtime
+handler = APIHandler
 if __name__ == '__main__':
     port = 8000
     if len(sys.argv) > 1:

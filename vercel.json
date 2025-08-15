@@ -1,24 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "functions": {
-    "api/*.py": {
-      "runtime": "python3.12"
-    },
-    "server.py": {
-      "runtime": "python3.12"
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/server.py"
-    },
-    {
-      "source": "/(.*)", 
-      "destination": "/public/$1"
-    }
-  ],
+  "public": "public", 
   "headers": [
     {
       "source": "/api/(.*)",
