@@ -211,14 +211,28 @@ class handler(BaseHTTPRequestHandler):
             try:
                 speech_service = get_speech_service()
                 
-                # 检查模式并添加警告
+                # 检查模式并添加调试信息
                 current_mode = get_current_mode()
+                tts_app_id = os.environ.get('TTS_APP_ID', '')
+                tts_access_token = os.environ.get('TTS_ACCESS_TOKEN', '')
+                vercel_env = os.environ.get('VERCEL_ENV', 'none')
+                mode_env = os.environ.get('MODE', 'none')
+                
+                print(f"[TTS DEBUG] Current mode: {current_mode}")
+                print(f"[TTS DEBUG] MODE env var: {mode_env}")
+                print(f"[TTS DEBUG] VERCEL_ENV: {vercel_env}")
+                print(f"[TTS DEBUG] TTS_APP_ID configured: {'yes' if tts_app_id and tts_app_id != 'your_tts_app_id_here' else 'no'}")
+                print(f"[TTS DEBUG] TTS_ACCESS_TOKEN configured: {'yes' if tts_access_token and tts_access_token != 'your_tts_access_token_here' else 'no'}")
+                print(f"[TTS DEBUG] Provider: {speech_service.get_provider_name()}")
+                
                 if current_mode in ['local', 'sandbox']:
                     print(f"WARNING: TTS service running in {current_mode} mode. Audio may be placeholder/silent.")
                     if current_mode == 'local':
                         print("INFO: Local mode generates placeholder audio files. Set MODE=prod for real TTS.")
                     elif current_mode == 'sandbox':
                         print("INFO: Sandbox mode generates test audio. Set MODE=prod for real TTS.")
+                else:
+                    print(f"INFO: TTS service running in production mode with {speech_service.get_provider_name()} provider.")
                         
             except ValueError as e:
                 cors_headers = _get_cors_headers(request_id=request_id, mode=mode)
