@@ -134,7 +134,8 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                                         "request": {
                                             "reqid": reqid,
                                             "operation": "query",
-                                            # 与 submit 保持一致的可选字段（有些服务端实现会校验）
+                                            # query 操作也需要包含 text 字段，否则会返回 "Do not support empty input!"
+                                            "text": payload.get("request", {}).get("text", ""),
                                             "text_type": payload.get("request", {}).get("text_type", "plain"),
                                             "enable_subtitle": payload.get("request", {}).get("enable_subtitle", False)
                                         }
