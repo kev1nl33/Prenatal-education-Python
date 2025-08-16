@@ -133,10 +133,13 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                                         "audio": payload.get("audio", {}),
                                         "request": {
                                             "reqid": reqid,
-                                            "operation": "query"
+                                            "operation": "query",
+                                            # 与 submit 保持一致的可选字段（有些服务端实现会校验）
+                                            "text_type": payload.get("request", {}).get("text_type", "plain"),
+                                            "enable_subtitle": payload.get("request", {}).get("enable_subtitle", False)
                                         }
                                     }
-                                    print(f"[PROD_ADAPTER DEBUG] Polling query attempt {poll_count} with reqid={reqid}")
+                                    print(f"[PROD_ADAPTER DEBUG] Query payload: {json.dumps(query_payload, indent=2, ensure_ascii=False)}")
                                     q_req_data = json.dumps(query_payload).encode("utf-8")
                                     q_req = urllib.request.Request(
                                         self.api_url,
@@ -146,47 +149,79 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                                             "Authorization": f"Bearer;{self.access_token}"
                                         }
                                     )
-                                    remaining = max(1, int(deadline - time.time()))
-                                    with urllib.request.urlopen(q_req, timeout=remaining, context=ctx) as q_resp:
-                                        q_data = q_resp.read()
-                                        try:
-                                            q_json = json.loads(q_data.decode("utf-8"))
-                                            print(f"[PROD_ADAPTER DEBUG] Query JSON response: {json.dumps(q_json, indent=2, ensure_ascii=False)}")
-                                            q_code = q_json.get("code")
-                                            if q_code == 0:
-                                                # 查找音频数据 - 支持多种可能的响应格式
-                                                audio_base64 = None
-                                                if "data" in q_json and isinstance(q_json["data"], str):
-                                                    audio_base64 = q_json["data"]
-                                                elif "data" in q_json and isinstance(q_json["data"], dict):
-                                                    if "audio" in q_json["data"] and isinstance(q_json["data"]["audio"], str):
-                                                        audio_base64 = q_json["data"]["audio"]
-                                                    elif "audio" in q_json["data"] and isinstance(q_json["data"]["audio"], dict):
-                                                        if "bytes" in q_json["data"]["audio"] and isinstance(q_json["data"]["audio"]["bytes"], str):
-                                                            audio_base64 = q_json["data"]["audio"]["bytes"]
-                                                elif "audio" in q_json and isinstance(q_json["audio"], str):
-                                                    audio_base64 = q_json["audio"]
-                                                if audio_base64:
-                                                    return base64.b64decode(audio_base64)
+                                    print(f"[PROD_ADAPTER DEBUG] Query request headers: {dict(q_req.headers)}")
+                                    try:
+                                        remaining = max(1, int(deadline - time.time()))
+                                        with urllib.request.urlopen(q_req, timeout=remaining, context=ctx) as q_resp:
+                                            q_data = q_resp.read()
+                                            try:
+                                                q_json = json.loads(q_data.decode("utf-8"))
+                                                print(f"[PROD_ADAPTER DEBUG] Query JSON response: {json.dumps(q_json, indent=2, ensure_ascii=False)}")
+                                                q_code = q_json.get("code")
+                                                if q_code == 0:
+                                                    # 查找音频数据 - 支持多种可能的响应格式
+                                                    audio_base64 = None
+                                                    if "data" in q_json and isinstance(q_json["data"], str):
+                                                        audio_base64 = q_json["data"]
+                                                    elif "data" in q_json and isinstance(q_json["data"], dict):
+                                                        if "audio" in q_json["data"] and isinstance(q_json["data"]["audio"], str):
+                                                            audio_base64 = q_json["data"]["audio"]
+                                                        elif "audio" in q_json["data"] and isinstance(q_json["data"]["audio"], dict):
+                                                            if "bytes" in q_json["data"]["audio"] and isinstance(q_json["data"]["audio"]["bytes"], str):
+                                                                audio_base64 = q_json["data"]["audio"]["bytes"]
+                                                    elif "audio" in q_json and isinstance(q_json["audio"], str):
+                                                        audio_base64 = q_json["audio"]
+                                                    if audio_base64:
+                                                        return base64.b64decode(audio_base64)
+                                                    else:
+                                                        print(f"[PROD_ADAPTER DEBUG] No audio data in successful query response; available fields: {list(q_json.keys())}")
+                                                        raise Exception("No audio data found in API response")
+                                                # 将一批处理中状态统一视为继续轮询
+                                                in_progress = False
+                                                if isinstance(q_code, int):
+                                                    if q_code == 3000 or q_code == 3001 or (3000 <= q_code < 3200):
+                                                        in_progress = True
+                                                if in_progress or str(q_json.get("message", "")).lower() in ("processing", "pending"):
+                                                    time.sleep(1.2)
+                                                    continue
                                                 else:
-                                                    print(f"[PROD_ADAPTER DEBUG] No audio data in successful query response; available fields: {list(q_json.keys())}")
-                                                    raise Exception("No audio data found in API response")
-                                            elif q_code == 3000:
-                                                # 仍在处理中，稍后重试
-                                                time.sleep(1.2)
-                                                continue
-                                            else:
-                                                err = q_json.get("message", "Unknown error")
-                                                raise Exception(f"Volcengine API error ({q_code}): {err}")
-                                        except json.JSONDecodeError as qe:
-                                            print(f"[PROD_ADAPTER DEBUG] JSON decode error on query: {qe}")
-                                            print(f"[PROD_ADAPTER DEBUG] Raw query response (first 500 chars): {q_data[:500]}")
-                                            # 如果不是JSON，可能是直接的音频数据
-                                            if len(q_data) > 100:
-                                                print(f"[PROD_ADAPTER DEBUG] Treating query response as raw audio data")
-                                                return q_data
-                                            else:
-                                                raise Exception(f"Invalid JSON response on query: {qe}")
+                                                    err = q_json.get("message", "Unknown error")
+                                                    raise Exception(f"Volcengine API error ({q_code}): {err}")
+                                            except json.JSONDecodeError as qe:
+                                                print(f"[PROD_ADAPTER DEBUG] JSON decode error on query: {qe}")
+                                                print(f"[PROD_ADAPTER DEBUG] Raw query response (first 500 chars): {q_data[:500]}")
+                                                # 如果不是JSON，可能是直接的音频数据
+                                                if len(q_data) > 100:
+                                                    print(f"[PROD_ADAPTER DEBUG] Treating query response as raw audio data")
+                                                    return q_data
+                                                else:
+                                                    raise Exception(f"Invalid JSON response on query: {qe}")
+                                    except urllib.error.HTTPError as he:
+                                        error_body = he.read().decode('utf-8') if he.fp else str(he)
+                                        print(f"[PROD_ADAPTER DEBUG] Query HTTPError {he.code}: {error_body}")
+                                        if he.code in [429, 500, 502, 503, 504] and time.time() < deadline:
+                                            time.sleep(1.5)
+                                            continue
+                                        elif he.code == 404 and time.time() < deadline:
+                                            # 任务可能尚未就绪，稍后继续轮询
+                                            time.sleep(1.0)
+                                            continue
+                                        elif he.code == 401:
+                                            raise Exception("Authentication failed: Invalid access token")
+                                        elif he.code == 403:
+                                            raise Exception("Access forbidden: Check your permissions")
+                                        else:
+                                            raise Exception(f"TTS service error ({he.code}): {error_body}")
+                                    except urllib.error.URLError as ue:
+                                        print(f"[PROD_ADAPTER DEBUG] Query URLError: {ue}")
+                                        if ("timeout" in str(ue).lower() or "timed out" in str(ue).lower()) and time.time() < deadline:
+                                            time.sleep(1.2)
+                                            continue
+                                        elif time.time() < deadline:
+                                            time.sleep(1.0)
+                                            continue
+                                        else:
+                                            raise Exception("Request timeout: TTS synthesis took too long")
                                 # 超时
                                 raise Exception("Request timeout: TTS synthesis took too long")
                             else:
