@@ -159,25 +159,31 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                                                 q_json = json.loads(q_data.decode("utf-8"))
                                                 print(f"[PROD_ADAPTER DEBUG] Query JSON response: {json.dumps(q_json, indent=2, ensure_ascii=False)}")
                                                 q_code = q_json.get("code")
+                                                
+                                                # 首先检查是否有音频数据，无论 code 是什么
+                                                audio_base64 = None
+                                                if "data" in q_json and isinstance(q_json["data"], str):
+                                                    audio_base64 = q_json["data"]
+                                                elif "data" in q_json and isinstance(q_json["data"], dict):
+                                                    if "audio" in q_json["data"] and isinstance(q_json["data"]["audio"], str):
+                                                        audio_base64 = q_json["data"]["audio"]
+                                                    elif "audio" in q_json["data"] and isinstance(q_json["data"]["audio"], dict):
+                                                        if "bytes" in q_json["data"]["audio"] and isinstance(q_json["data"]["audio"]["bytes"], str):
+                                                            audio_base64 = q_json["data"]["audio"]["bytes"]
+                                                elif "audio" in q_json and isinstance(q_json["audio"], str):
+                                                    audio_base64 = q_json["audio"]
+                                                
+                                                # 如果有音频数据，直接返回（无论 code 是 0 还是 3000）
+                                                if audio_base64:
+                                                    print(f"[PROD_ADAPTER DEBUG] Found audio data in query response with code {q_code}")
+                                                    return base64.b64decode(audio_base64)
+                                                
+                                                # 如果没有音频数据，检查是否是成功状态但缺少数据
                                                 if q_code == 0:
-                                                    # 查找音频数据 - 支持多种可能的响应格式
-                                                    audio_base64 = None
-                                                    if "data" in q_json and isinstance(q_json["data"], str):
-                                                        audio_base64 = q_json["data"]
-                                                    elif "data" in q_json and isinstance(q_json["data"], dict):
-                                                        if "audio" in q_json["data"] and isinstance(q_json["data"]["audio"], str):
-                                                            audio_base64 = q_json["data"]["audio"]
-                                                        elif "audio" in q_json["data"] and isinstance(q_json["data"]["audio"], dict):
-                                                            if "bytes" in q_json["data"]["audio"] and isinstance(q_json["data"]["audio"]["bytes"], str):
-                                                                audio_base64 = q_json["data"]["audio"]["bytes"]
-                                                    elif "audio" in q_json and isinstance(q_json["audio"], str):
-                                                        audio_base64 = q_json["audio"]
-                                                    if audio_base64:
-                                                        return base64.b64decode(audio_base64)
-                                                    else:
-                                                        print(f"[PROD_ADAPTER DEBUG] No audio data in successful query response; available fields: {list(q_json.keys())}")
-                                                        raise Exception("No audio data found in API response")
-                                                # 将一批处理中状态统一视为继续轮询
+                                                    print(f"[PROD_ADAPTER DEBUG] No audio data in successful query response; available fields: {list(q_json.keys())}")
+                                                    raise Exception("No audio data found in API response")
+                                                
+                                                # 将一批处理中状态统一视为继续轮询（但排除已有音频数据的情况）
                                                 in_progress = False
                                                 if isinstance(q_code, int):
                                                     if q_code == 3000 or q_code == 3001 or (3000 <= q_code < 3200):
