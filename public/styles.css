@@ -1,4 +1,7 @@
 * { box-sizing: border-box; }
+html { 
+  scroll-behavior: smooth;
+}
 html, body { height: 100%; }
 body {
   margin: 0;
@@ -16,12 +19,12 @@ body {
   100% { background-position: 0% 50%; }
 }
 
-.container { max-width: 980px; margin: 0 auto; padding: 24px; }
+.container { max-width: 980px; margin: 0 auto; padding: 16px; }
 
 .header {
   text-align: center;
-  margin-bottom: 40px;
-  padding: 40px 20px;
+  margin-bottom: 24px;
+  padding: 24px 20px;
   background: rgba(255, 255, 255, 0.25);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -212,8 +215,56 @@ input:focus, select:focus, textarea:focus { border-color: #93C5FD; box-shadow: 0
 
 .content-display { display: grid; gap: 12px; }
 .content-text { white-space: pre-wrap; background: #F8FAFC; padding: 12px; border-radius: 12px; border: 1px solid #E2E8F0; min-height: 100px; line-height: 1.7; }
-.audio-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.audio-player { display: flex; align-items: center; gap: 12px; }
+.audio-controls { 
+  display: flex; 
+  flex-direction: column;
+  gap: 16px; 
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.voice-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.voice-settings .form-group {
+  margin: 0;
+}
+
+.voice-settings label {
+  font-weight: 500;
+  color: #2c3e50;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.voice-settings select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #2c3e50;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.voice-settings select:focus {
+  outline: none;
+  border-color: #FF6B6B;
+  box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.1);
+}
+
+.audio-player { 
+  display: flex; 
+  align-items: center; 
+  gap: 12px; 
+  flex-wrap: wrap;
+}
 
 .history-list { display: grid; gap: 10px; }
 .history-item {

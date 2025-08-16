@@ -101,49 +101,40 @@
             <section class="content-section">
                 <h2>选择胎教内容类型</h2>
                 <div class="content-cards">
-                    <div class="content-card" data-type="story">
-                        <div class="card-icon">📚</div>
+                    <div class="content-card active" data-type="story">
+                        <div class="card-icon">📖</div>
                         <h3>温馨故事</h3>
-                        <p>充满爱与温暖的胎教故事，培养宝宝的想象力和情感</p>
+                        <p>温馨的胎教故事，富有想象力，传递爱与希望</p>
+                    </div>
+                    <div class="content-card" data-type="music">
+                        <div class="card-icon">🎵</div>
+                        <h3>音乐引导</h3>
+                        <p>轻柔的音乐引导，深度放松，心灵沟通</p>
                     </div>
                     <div class="content-card" data-type="poetry">
-                        <div class="card-icon">🎭</div>
+                        <div class="card-icon">🌸</div>
                         <h3>诗歌朗诵</h3>
-                        <p>优美的诗歌和儿歌，提升宝宝的语言感知和韵律感</p>
-                    </div>
-                    <div class="content-card" data-type="wisdom">
-                        <div class="card-icon">🌟</div>
-                        <h3>育儿智慧</h3>
-                        <p>科学的育儿知识和温馨提醒，为准妈妈提供指导</p>
+                        <p>优美的诗歌韵律，适合轻声吟诵，营造宁静氛围</p>
                     </div>
                     <div class="content-card" data-type="nature">
                         <div class="card-icon">🌿</div>
                         <h3>自然描述</h3>
-                        <p>美丽的自然景象描述，让宝宝感受大自然的美好</p>
+                        <p>美丽的自然景象，感受大自然的美好与宁静</p>
                     </div>
                     <div class="content-card" data-type="emotion">
                         <div class="card-icon">💝</div>
                         <h3>情感表达</h3>
-                        <p>表达对宝宝的爱意和期待，增进亲子情感连接</p>
+                        <p>表达深深的爱意和期待，增进亲子情感纽带</p>
                     </div>
                     <div class="content-card" data-type="learning">
                         <div class="card-icon">🎨</div>
                         <h3>启蒙认知</h3>
-                        <p>简单的认知启蒙内容，如颜色、形状、数字等</p>
+                        <p>温和的认知启蒙，颜色形状数字等基础概念</p>
                     </div>
                 </div>
                 
                 <div class="content-form">
                     <input type="hidden" id="contentType" value="story">
-                    
-                    <div class="form-group">
-                        <label for="voiceSelector">选择朗读语音:</label>
-                        <select id="voiceSelector">
-                            <option value="zh_male_shenyeboke_moon_bigtts">🎙️ 男声-深夜播客</option>
-                            <option value="zh_female_xinlingjitang_moon_bigtts">🎵 女声-温柔知性</option>
-                            <option value="zh_female_shaoergushi_mars_bigtts">🧸 儿童-少儿故事</option>
-                        </select>
-                    </div>
                     
                     <div class="form-group">
                         <label for="mood">期望情绪:</label>
@@ -176,6 +167,16 @@
                 <div class="content-display">
                     <div class="content-text" id="contentText"></div>
                     <div class="audio-controls">
+                        <div class="voice-settings">
+                            <div class="form-group">
+                                <label for="voiceSelector">选择朗读语音:</label>
+                                <select id="voiceSelector">
+                                    <option value="zh_male_shenyeboke_moon_bigtts">🎙️ 男声-深夜播客</option>
+                                    <option value="zh_female_xinlingjitang_moon_bigtts">🎵 女声-温柔知性</option>
+                                    <option value="zh_female_shaoergushi_mars_bigtts">🧸 儿童-少儿故事</option>
+                                </select>
+                            </div>
+                        </div>
                         <button id="generateAudio" class="btn btn-secondary">
                             <span class="btn-text">生成语音</span>
                             <div class="loading-spinner" style="display: none;"></div>
