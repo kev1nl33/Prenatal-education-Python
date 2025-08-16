@@ -114,10 +114,85 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                         
                         # 检查响应是否成功
                         if "code" in json_response:
-                            if json_response["code"] != 0:
+                            code = json_response["code"]
+                            if code == 0:
+                                # 成功，继续在下面的通用解析逻辑中提取音频
+                                pass
+                            elif code == 3000 and json_response.get("operation") == "submit":
+                                # 提交已接受，进入 query 轮询直到合成完成或超时
+                                reqid = json_response.get("reqid") or payload.get("request", {}).get("reqid")
+                                if not reqid:
+                                    raise Exception("Volcengine API returned 3000 but no reqid to query")
+                                deadline = time.time() + self.timeout
+                                poll_count = 0
+                                while time.time() < deadline:
+                                    poll_count += 1
+                                    query_payload = {
+                                        "app": payload.get("app", {}),
+                                        "user": payload.get("user", {}),
+                                        "audio": payload.get("audio", {}),
+                                        "request": {
+                                            "reqid": reqid,
+                                            "operation": "query"
+                                        }
+                                    }
+                                    print(f"[PROD_ADAPTER DEBUG] Polling query attempt {poll_count} with reqid={reqid}")
+                                    q_req_data = json.dumps(query_payload).encode("utf-8")
+                                    q_req = urllib.request.Request(
+                                        self.api_url,
+                                        data=q_req_data,
+                                        headers={
+                                            "Content-Type": "application/json",
+                                            "Authorization": f"Bearer;{self.access_token}"
+                                        }
+                                    )
+                                    remaining = max(1, int(deadline - time.time()))
+                                    with urllib.request.urlopen(q_req, timeout=remaining, context=ctx) as q_resp:
+                                        q_data = q_resp.read()
+                                        try:
+                                            q_json = json.loads(q_data.decode("utf-8"))
+                                            print(f"[PROD_ADAPTER DEBUG] Query JSON response: {json.dumps(q_json, indent=2, ensure_ascii=False)}")
+                                            q_code = q_json.get("code")
+                                            if q_code == 0:
+                                                # 查找音频数据 - 支持多种可能的响应格式
+                                                audio_base64 = None
+                                                if "data" in q_json and isinstance(q_json["data"], str):
+                                                    audio_base64 = q_json["data"]
+                                                elif "data" in q_json and isinstance(q_json["data"], dict):
+                                                    if "audio" in q_json["data"] and isinstance(q_json["data"]["audio"], str):
+                                                        audio_base64 = q_json["data"]["audio"]
+                                                    elif "audio" in q_json["data"] and isinstance(q_json["data"]["audio"], dict):
+                                                        if "bytes" in q_json["data"]["audio"] and isinstance(q_json["data"]["audio"]["bytes"], str):
+                                                            audio_base64 = q_json["data"]["audio"]["bytes"]
+                                                elif "audio" in q_json and isinstance(q_json["audio"], str):
+                                                    audio_base64 = q_json["audio"]
+                                                if audio_base64:
+                                                    return base64.b64decode(audio_base64)
+                                                else:
+                                                    print(f"[PROD_ADAPTER DEBUG] No audio data in successful query response; available fields: {list(q_json.keys())}")
+                                                    raise Exception("No audio data found in API response")
+                                            elif q_code == 3000:
+                                                # 仍在处理中，稍后重试
+                                                time.sleep(1.2)
+                                                continue
+                                            else:
+                                                err = q_json.get("message", "Unknown error")
+                                                raise Exception(f"Volcengine API error ({q_code}): {err}")
+                                        except json.JSONDecodeError as qe:
+                                            print(f"[PROD_ADAPTER DEBUG] JSON decode error on query: {qe}")
+                                            print(f"[PROD_ADAPTER DEBUG] Raw query response (first 500 chars): {q_data[:500]}")
+                                            # 如果不是JSON，可能是直接的音频数据
+                                            if len(q_data) > 100:
+                                                print(f"[PROD_ADAPTER DEBUG] Treating query response as raw audio data")
+                                                return q_data
+                                            else:
+                                                raise Exception(f"Invalid JSON response on query: {qe}")
+                                # 超时
+                                raise Exception("Request timeout: TTS synthesis took too long")
+                            else:
                                 error_msg = json_response.get("message", "Unknown error")
-                                print(f"[PROD_ADAPTER DEBUG] API returned error code {json_response['code']}: {error_msg}")
-                                raise Exception(f"Volcengine API error ({json_response['code']}): {error_msg}")
+                                print(f"[PROD_ADAPTER DEBUG] API returned error code {code}: {error_msg}")
+                                raise Exception(f"Volcengine API error ({code}): {error_msg}")
                         
                         # 查找音频数据 - 支持多种可能的响应格式
                         audio_base64 = None
