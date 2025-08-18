@@ -137,16 +137,6 @@
                     <input type="hidden" id="contentType" value="story">
                     
                     <div class="form-group">
-                        <label for="mood">期望情绪:</label>
-                        <select id="mood">
-                            <option value="calm">平静放松</option>
-                            <option value="happy">愉悦开心</option>
-                            <option value="peaceful">安详宁静</option>
-                            <option value="warm">温暖关爱</option>
-                            <option value="energetic">活力充沛</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
                         <label for="duration">内容长度:</label>
                         <select id="duration">
                             <option value="short">短篇 (3-5分钟)</option>
@@ -165,15 +155,25 @@
             <section class="result-section" id="resultSection" style="display: none;">
                 <h2>生成的胎教内容</h2>
                 <div class="content-display">
-                    <div class="content-text" id="contentText"></div>
+                    <div class="content-text-container">
+                        <div class="content-text" id="contentText"></div>
+                        <button class="expand-btn" id="expandBtn" style="display: none;">展开全文</button>
+                    </div>
                     <div class="audio-controls">
                         <div class="voice-settings">
                             <div class="form-group">
                                 <label for="voiceSelector">选择朗读语音:</label>
                                 <select id="voiceSelector">
-                                    <option value="zh_male_shenyeboke_moon_bigtts">🎙️ 男声-深夜播客</option>
-                                    <option value="zh_female_xinlingjitang_moon_bigtts">🎵 女声-温柔知性</option>
-                                    <option value="zh_female_shaoergushi_mars_bigtts">🧸 儿童-少儿故事</option>
+                                    <option value="zh_female_roumeinvyou_emo_v2_mars_bigtts">💕 柔美女友（多情感）</option>
+                                    <option value="zh_female_shuangkuaisisi_emo_v2_mars_bigtts">🌟 爽快思思（多情感）</option>
+                                    <option value="zh_male_yangguangqingnian_emo_v2_mars_bigtts">☀️ 阳光青年（多情感）</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="mood">期望情绪:</label>
+                                <select id="mood">
+                                    <option value="happy">开心</option>
+                                    <option value="neutral">中性</option>
                                 </select>
                             </div>
                         </div>

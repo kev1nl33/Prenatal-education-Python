@@ -161,27 +161,103 @@ function generateMockContent(_prompt) {
 }
 
 // 模拟TTS合成（测试模式）
-function generateMockTTS() {
-  return new Promise((resolve) => {
-    // 模拟TTS延迟
-    setTimeout(() => {
-      // 生成一个简单的音频blob（静音）
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const sampleRate = audioContext.sampleRate;
-      const duration = 3; // 3秒
-      const numSamples = sampleRate * duration;
-      const audioBuffer = audioContext.createBuffer(1, numSamples, sampleRate);
+async function generateMockTTS() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      // 模拟TTS延迟
+      setTimeout(async () => {
+        try {
+          // 根据当前选择的语音类型返回不同的音频
+          const voiceType = state.voiceType || 'zh_male_shenyeboke_moon_bigtts';
+          
+          // 尝试加载demo音频文件
+          const response = await fetch('/demo-sounds/胎教音频_2025-08-18-01-19-11.mp3');
+          if (response.ok) {
+            const audioBlob = await response.blob();
+            
+            // 根据语音类型模拟不同的音频效果
+            console.log(`测试模式：使用${getVoiceTypeName(voiceType)}生成音频`);
+            
+            resolve({
+              data: await blobToBase64(audioBlob),
+              encoding: 'mp3',
+              voice_type: voiceType,
+              mode: 'test'
+            });
+          } else {
+            // 如果demo文件不存在，生成简单的音调作为备选
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const sampleRate = audioContext.sampleRate;
+            const duration = 3;
+            const numSamples = sampleRate * duration;
+            const audioBuffer = audioContext.createBuffer(1, numSamples, sampleRate);
 
-      // 生成简单的音调
-      const channelData = audioBuffer.getChannelData(0);
-      for (let i = 0; i < numSamples; i++) {
-        channelData[i] = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 0.1; // 440Hz音调，低音量
+            // 根据语音类型生成不同频率的音调
+            const frequency = getFrequencyByVoiceType(voiceType);
+            const channelData = audioBuffer.getChannelData(0);
+            for (let i = 0; i < numSamples; i++) {
+              channelData[i] = Math.sin(2 * Math.PI * frequency * i / sampleRate) * 0.1;
+            }
+
+            const wavBlob = audioBufferToWav(audioBuffer);
+            resolve({
+              data: await blobToBase64(wavBlob),
+              encoding: 'wav',
+              voice_type: voiceType,
+              mode: 'test'
+            });
+          }
+        } catch (error) {
+          reject(error);
+        }
+      }, 1000 + Math.random() * 1000); // 1-2秒随机延迟
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+// 根据语音类型获取显示名称
+function getVoiceTypeName(voiceType) {
+  const voiceNames = {
+    'zh_female_roumeinvyou_emo_v2_mars_bigtts': '柔美女友（多情感）',
+    'zh_female_shuangkuaisisi_emo_v2_mars_bigtts': '爽快思思（多情感）',
+    'zh_male_yangguangqingnian_emo_v2_mars_bigtts': '阳光青年（多情感）'
+  };
+  return voiceNames[voiceType] || '默认语音';
+}
+
+// 根据语音类型获取不同的音调频率（用于备选音频生成）
+function getFrequencyByVoiceType(voiceType) {
+  const frequencies = {
+    'zh_female_roumeinvyou_emo_v2_mars_bigtts': 440,  // 中音（柔美女友）
+    'zh_female_shuangkuaisisi_emo_v2_mars_bigtts': 520, // 中高音（爽快思思）
+    'zh_male_yangguangqingnian_emo_v2_mars_bigtts': 330  // 中低音（阳光青年）
+  };
+  return frequencies[voiceType] || 440;
+}
+
+// 将Blob转换为Base64
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    // 类型检查：确保传入的参数是Blob类型
+    if (!(blob instanceof Blob)) {
+      // 如果是ArrayBuffer，转换为Blob
+      if (blob instanceof ArrayBuffer) {
+        blob = new Blob([blob], { type: 'audio/wav' });
+      } else {
+        reject(new Error(`blobToBase64函数期望接收Blob或ArrayBuffer类型，但实际接收到：${typeof blob}`));
+        return;
       }
-
-      // 转换为WAV格式
-      const wavBlob = audioBufferToWav(audioBuffer);
-      resolve(wavBlob);
-    }, 2000 + Math.random() * 1000); // 2-3秒随机延迟
+    }
+    
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result.split(',')[1]; // 移除data:audio/...;base64,前缀
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
   });
 }
 
@@ -288,10 +364,11 @@ const state = {
   modelEndpoint: storage.get('ve_model_endpoint', ''),
   ttsAppId: storage.get('ve_tts_appid', ''),
   accessToken: storage.get('ve_access_token', ''),
-  voiceType: storage.get('ve_voice_type', 'zh_male_shenyeboke_moon_bigtts'),
+  voiceType: storage.get('ve_voice_type', 'zh_female_roumeinvyou_emo_v2_mars_bigtts'),
   testMode: storage.get('ve_test_mode', false),
   lastContent: '',
   lastAudioBlob: null,
+  lastAudioUrl: null, // 添加URL跟踪
   history: storage.get('ve_history', [])
 };
 
@@ -326,7 +403,9 @@ const el = {
   historyModal: document.getElementById('historyModal'),
   closeHistoryModal: document.getElementById('closeHistoryModal'),
   closeHistoryModalBtn: document.getElementById('closeHistoryModalBtn'),
-  clearAllHistory: document.getElementById('clearAllHistory')
+  clearAllHistory: document.getElementById('clearAllHistory'),
+  // 展开按钮
+  expandBtn: document.getElementById('expandBtn')
 };
 
 // 模态框控制函数
@@ -361,6 +440,9 @@ function init() {
 
   // 初始化历史记录功能
   initHistoryModal();
+
+  // 初始化文本展开功能
+  initTextExpansion();
 
   renderHistory();
 
@@ -410,7 +492,7 @@ function selectContentCard(selectedCard) {
 // 初始化语音选择器（下拉框）
 function initVoiceSelector() {
   // 设置当前选中的语音
-  el.voiceSelector.value = state.voiceType || 'zh_male_shenyeboke_moon_bigtts';
+  el.voiceSelector.value = state.voiceType || 'zh_female_roumeinvyou_emo_v2_mars_bigtts';
 
   // 添加change事件监听器
   el.voiceSelector.addEventListener('change', (e) => {
@@ -507,6 +589,39 @@ function getContentTypeLabel(type) {
 // 加载历史记录项
 
 
+// 初始化文本展开功能
+function initTextExpansion() {
+  if (el.expandBtn) {
+    el.expandBtn.addEventListener('click', toggleTextExpansion);
+  }
+}
+
+// 切换文本展开/收起
+function toggleTextExpansion() {
+  const isExpanded = el.contentText.classList.contains('expanded');
+  
+  if (isExpanded) {
+    el.contentText.classList.remove('expanded');
+    el.expandBtn.textContent = '展开全文';
+  } else {
+    el.contentText.classList.add('expanded');
+    el.expandBtn.textContent = '收起';
+  }
+}
+
+// 检查文本长度并显示/隐藏展开按钮
+function checkTextLength(text) {
+  const maxLength = 500;
+  if (text.length > maxLength) {
+    el.expandBtn.style.display = 'block';
+    return true;
+  } else {
+    el.expandBtn.style.display = 'none';
+    el.contentText.classList.remove('expanded');
+    return false;
+  }
+}
+
 // 清空所有历史记录
 function clearAllHistoryRecords() {
   state.history = [];
@@ -585,6 +700,7 @@ el.generateContent.addEventListener('click', async() => {
     const text = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : '';
     state.lastContent = text;
     el.contentText.textContent = text;
+    checkTextLength(text); // 检查文本长度并显示/隐藏展开按钮
     el.resultSection.style.display = 'block';
     el.audioPlayer.style.display = 'none';
     addHistory({
@@ -612,36 +728,70 @@ el.generateAudio.addEventListener('click', async() => {
   try {
     const payload = {
       text: state.lastContent,
-      voice_type: state.voiceType || 'default',
+      voice_type: state.voiceType || 'zh_female_roumeinvyou_emo_v2_mars_bigtts',
+      emotion: el.mood.value === 'happy' ? 'happy' : 'neutral',
       quality: 'draft'
     };
     const data = await ttsSynthesize(payload);
 
-    // 根据火山引擎TTS文档，音频数据位于 data 字段中，且已经是base64编码
     let audioBase64;
-    if (data.data && typeof data.data === 'string') {
-      // 直接的base64字符串
-      audioBase64 = data.data;
-    } else if (data.data && data.data.audio) {
-      // 嵌套在data.audio中
-      audioBase64 = data.data.audio;
-    } else if (data.audio) {
-      // 直接在audio字段中
-      audioBase64 = data.audio;
+    let blob;
+    
+    // 处理测试模式和生产模式的不同返回格式
+    if (state.testMode || (data.mode && data.mode === 'test')) {
+      // 测试模式：data已经是包含base64数据的对象
+      if (data.data && typeof data.data === 'string') {
+        audioBase64 = data.data;
+      } else {
+        throw new Error('测试模式返回格式异常：未找到音频数据');
+      }
+      
+      const audioBytes = base64ToBytes(audioBase64);
+      const mimeType = data.encoding === 'wav' ? 'audio/wav' : 'audio/mpeg';
+      blob = new Blob([audioBytes], { type: mimeType });
+      
+      // 显示当前使用的语音类型
+      const voiceTypeName = getVoiceTypeName(data.voice_type || state.voiceType);
+      console.log(`使用语音类型：${voiceTypeName}`);
+      showSuccess(`语音生成成功！当前语音：${voiceTypeName}`);
     } else {
-      throw new Error('TTS返回格式异常：未找到音频数据');
+      // 生产模式：按原有逻辑处理
+      if (data.data && typeof data.data === 'string') {
+        audioBase64 = data.data;
+      } else if (data.data && data.data.audio) {
+        audioBase64 = data.data.audio;
+      } else if (data.audio) {
+        audioBase64 = data.audio;
+      } else {
+        throw new Error('TTS返回格式异常：未找到音频数据');
+      }
+      
+      const audioBytes = base64ToBytes(audioBase64);
+      const mimeType = data.encoding ? (data.encoding === 'wav' ? 'audio/wav' : 'audio/mpeg') : detectAudioMimeType(audioBytes);
+      blob = new Blob([audioBytes], { type: mimeType });
+      
+      const voiceTypeName = getVoiceTypeName(state.voiceType);
+      showSuccess(`语音生成成功！当前语音：${voiceTypeName}`);
     }
 
-    const audioBytes = base64ToBytes(audioBase64);
-    // Determine correct MIME type from bytes or response info
-    const mimeType = data.encoding ? (data.encoding === 'wav' ? 'audio/wav' : 'audio/mpeg') : detectAudioMimeType(audioBytes);
-    const blob = new Blob([audioBytes], { type: mimeType });
+    // 清理旧的blob URL
+    if (state.lastAudioUrl) {
+      URL.revokeObjectURL(state.lastAudioUrl);
+    }
+    
     state.lastAudioBlob = blob;
     const url = URL.createObjectURL(blob);
+    state.lastAudioUrl = url;
+    
+    // 添加错误处理
+    el.audioElement.onerror = (e) => {
+      console.error('音频加载失败:', e);
+      showError('音频播放失败，请重试');
+    };
+    
     el.audioElement.src = url;
     el.audioPlayer.style.display = 'flex';
 
-    showSuccess('语音生成成功！');
   } catch (e) {
     console.error(e);
     alert('生成语音失败：' + (e.message || '请稍后重试'));
@@ -667,11 +817,8 @@ function buildPrompt() {
   const duration = el.duration.value;
 
   const moodMap = {
-    calm: '平静放松',
     happy: '愉悦开心',
-    peaceful: '安详宁静',
-    warm: '温暖关爱',
-    energetic: '活力充沛'
+    neutral: '平和中性'
   };
 
   const durationMap = {
@@ -772,6 +919,7 @@ function renderHistory() {
       const text = btn.getAttribute('data-text');
       state.lastContent = text;
       el.contentText.textContent = text;
+      checkTextLength(text); // 检查文本长度并显示/隐藏展开按钮
       el.resultSection.style.display = 'block';
       el.audioPlayer.style.display = 'none';
       showSuccess('文本已载入，可以直接生成语音');
@@ -931,14 +1079,29 @@ async function generateAudioForHistoryItem(text) {
     // Determine correct MIME type from bytes or response info
     const mimeType = data.encoding ? (data.encoding === 'wav' ? 'audio/wav' : 'audio/mpeg') : detectAudioMimeType(audioBytes);
     const blob = new Blob([audioBytes], { type: mimeType });
+    
+    // 清理旧的blob URL
+    if (state.lastAudioUrl) {
+      URL.revokeObjectURL(state.lastAudioUrl);
+    }
+    
     state.lastAudioBlob = blob;
     const url = URL.createObjectURL(blob);
+    state.lastAudioUrl = url;
+    
+    // 添加错误处理
+    el.audioElement.onerror = (e) => {
+      console.error('音频加载失败:', e);
+      showError('音频播放失败，请重试');
+    };
+    
     el.audioElement.src = url;
     el.audioPlayer.style.display = 'flex';
 
     // 将历史记录的文本设置为当前内容
     state.lastContent = text;
     el.contentText.textContent = text;
+    checkTextLength(text); // 检查文本长度并显示/隐藏展开按钮
     el.resultSection.style.display = 'block';
 
     showSuccess('历史记录语音生成成功！');

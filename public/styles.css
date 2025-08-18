@@ -214,7 +214,43 @@ input:focus, select:focus, textarea:focus { border-color: #93C5FD; box-shadow: 0
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .content-display { display: grid; gap: 12px; }
-.content-text { white-space: pre-wrap; background: #F8FAFC; padding: 12px; border-radius: 12px; border: 1px solid #E2E8F0; min-height: 100px; line-height: 1.7; }
+.content-text-container {
+  position: relative;
+}
+
+.content-text { 
+  white-space: pre-wrap; 
+  background: #F8FAFC; 
+  padding: 12px; 
+  border-radius: 12px; 
+  border: 1px solid #E2E8F0; 
+  min-height: 100px; 
+  line-height: 1.7;
+  max-height: 300px;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.content-text.expanded {
+  max-height: none;
+}
+
+.expand-btn {
+  display: block;
+  margin: 8px auto 0;
+  padding: 6px 12px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.2s ease;
+}
+
+.expand-btn:hover {
+  background: #5a6fd8;
+}
 .audio-controls { 
   display: flex; 
   flex-direction: column;
@@ -227,8 +263,29 @@ input:focus, select:focus, textarea:focus { border-color: #93C5FD; box-shadow: 0
 
 .voice-settings {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  flex-direction: row;
+  gap: 20px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.voice-settings .form-group {
+  flex: 1;
+  min-width: 220px;
+  max-width: 300px;
+}
+
+@media (max-width: 768px) {
+  .voice-settings {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+  
+  .voice-settings .form-group {
+    min-width: auto;
+    max-width: none;
+  }
 }
 
 .voice-settings .form-group {
