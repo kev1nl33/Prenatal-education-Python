@@ -28,9 +28,9 @@ export default [
     rules: {
       // 代码质量规则
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-      'no-console': 'warn',
+      'no-console': 'off',
       'no-debugger': 'error',
-      'no-alert': 'warn',
+      'no-alert': 'off',
       'no-var': 'error',
       'prefer-const': 'error',
       'prefer-arrow-callback': 'error',

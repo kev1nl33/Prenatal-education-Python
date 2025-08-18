@@ -15,7 +15,7 @@ const storage = {
 };
 
 // 历史记录管理
-const HISTORY_KEY = 'prenatal_history';
+
 
 
 
@@ -116,7 +116,7 @@ function generateMockResponse(prompt) {
 }
 
 // 生成模拟内容
-function generateMockContent(prompt) {
+function generateMockContent(_prompt) {
   const contentType = el.contentType.value;
 
   const templates = {
@@ -471,7 +471,7 @@ function renderHistoryInModal() {
   historyList.innerHTML = state.history.map((item, index) => {
     const type = item.contentType || item.type || 'unknown';
     const timestamp = item.timestamp || item.time || Date.now();
-    const text = (item.content != null ? item.content : item.text) || '';
+    const text = (item.content !== null ? item.content : item.text) || '';
     const preview = text.substring(0, 100);
     return `
     <div class="history-item" data-index="${index}">
@@ -505,65 +505,7 @@ function getContentTypeLabel(type) {
 }
 
 // 加载历史记录项
-function loadHistoryItem(index) {
-  const item = state.history[index];
-  if (!item) {
-    return;
-  }
 
-  const type = item.contentType || item.type || 'story';
-  const text = (item.content != null ? item.content : item.text) || '';
-
-  // 设置内容类型
-  selectContentCardByType(type);
-
-  // 同步到状态，确保后续可直接生成语音
-  state.lastContent = text;
-
-  // 显示内容
-  el.contentText.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
-  el.resultSection.style.display = 'block';
-
-  // 如果有音频，设置音频；否则隐藏播放器并清空上一次的音频状态
-  if (item.audioBlob) {
-    state.lastAudioBlob = item.audioBlob;
-    const audioUrl = URL.createObjectURL(item.audioBlob);
-    el.audioElement.src = audioUrl;
-    el.audioPlayer.style.display = 'block';
-  } else {
-    state.lastAudioBlob = null;
-    el.audioElement.removeAttribute('src');
-    el.audioPlayer.style.display = 'none';
-  }
-
-  // 关闭模态框
-  hideHistoryModal();
-
-  // 滚动到结果区域
-  el.resultSection.scrollIntoView({ behavior: 'smooth' });
-
-  showSuccess('历史记录已加载');
-}
-
-// 根据类型选择内容卡片
-function selectContentCardByType(type) {
-  const targetCard = document.querySelector(`.content-card[data-type="${type}"]`);
-  if (targetCard) {
-    selectContentCard(targetCard);
-  }
-}
-
-// 删除历史记录项
-function deleteHistoryItem(index) {
-  if (confirm('确定要删除这条历史记录吗？')) {
-    state.history.splice(index, 1);
-    storage.set('ve_history', state.history);
-    renderHistoryInModal();
-    // 同时更新主页面的历史记录显示
-    renderHistory();
-    showSuccess('历史记录已删除');
-  }
-}
 
 // 清空所有历史记录
 function clearAllHistoryRecords() {
@@ -909,12 +851,7 @@ function audioBufferToWav(buffer) {
   return bufferArray;
 }
 
-function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
+
 
 function base64ToBytes(base64) {
   const binary_string = atob(base64);

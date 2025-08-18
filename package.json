@@ -1,6 +1,7 @@
 {
   "name": "prenatal-education-python",
   "version": "1.0.0",
+  "type": "module",
   "description": "Prenatal education application with Python API backend",
   "engines": {
     "node": "18.x"
