@@ -171,7 +171,7 @@ async function generateMockTTS() {
           const voiceType = state.voiceType || 'zh_male_shenyeboke_moon_bigtts';
           
           // 尝试加载demo音频文件
-          const response = await fetch('/demo-sounds/胎教音频_2025-08-18-01-19-11.mp3');
+          const response = await fetch('/demo-sounds/女性.mp3');
           if (response.ok) {
             const audioBlob = await response.blob();
             
