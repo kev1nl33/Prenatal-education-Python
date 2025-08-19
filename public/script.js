@@ -1048,9 +1048,477 @@ function detectAudioMimeType(audioBytes) {
   return 'audio/mpeg'; // 默认回退
 }
 
+// 声音复刻功能相关变量
+const voiceClone = {
+  uploadedFile: null,
+  trainingTasks: storage.get('ve_voice_clone_tasks', []),
+  clonedVoices: storage.get('ve_cloned_voices', []),
+  statusPollingInterval: null
+};
+
+// 声音复刻DOM元素
+const voiceCloneEl = {
+  uploadArea: document.getElementById('uploadArea'),
+  audioFileInput: document.getElementById('audioFileInput'),
+  uploadForm: document.getElementById('uploadForm'),
+  speakerName: document.getElementById('speakerName'),
+  voiceLanguage: document.getElementById('voiceLanguage'),
+  modelType: document.getElementById('modelType'),
+  startTraining: document.getElementById('startTraining'),
+  cancelUpload: document.getElementById('cancelUpload'),
+  statusEmpty: document.getElementById('statusEmpty'),
+  statusList: document.getElementById('statusList'),
+  voicesEmpty: document.getElementById('voicesEmpty'),
+  voicesList: document.getElementById('voicesList'),
+  refreshVoices: document.getElementById('refreshVoices')
+};
+
+// 声音复刻API调用函数
+async function voiceCloneAPI(action, data = {}) {
+  try {
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+
+    const payload = {
+      action: action,
+      ...data
+    };
+
+    const response = await fetch(`${API_BASE}/api/voice_clone`, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || `HTTP ${response.status}`);
+    }
+
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Voice Clone API error:', error);
+    throw error;
+  }
+}
+
+// 获取已复刻声音列表
+async function getClonedVoices() {
+  try {
+    const response = await fetch(`${API_BASE}/api/voice_clone?action=list`);
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || `HTTP ${response.status}`);
+    }
+    
+    return data.voices || [];
+  } catch (error) {
+    console.error('获取声音列表失败:', error);
+    return [];
+  }
+}
+
+// 查询训练状态
+async function getTrainingStatus(speakerId) {
+  try {
+    const response = await fetch(`${API_BASE}/api/voice_clone?action=status&speaker_id=${speakerId}`);
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || `HTTP ${response.status}`);
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('查询训练状态失败:', error);
+    return null;
+  }
+}
+
+// 初始化声音复刻功能
+function initVoiceClone() {
+  // 文件上传区域点击事件
+  voiceCloneEl.uploadArea.addEventListener('click', () => {
+    voiceCloneEl.audioFileInput.click();
+  });
+
+  // 文件拖拽上传
+  voiceCloneEl.uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    voiceCloneEl.uploadArea.classList.add('dragover');
+  });
+
+  voiceCloneEl.uploadArea.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    voiceCloneEl.uploadArea.classList.remove('dragover');
+  });
+
+  voiceCloneEl.uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    voiceCloneEl.uploadArea.classList.remove('dragover');
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      handleFileSelect(files[0]);
+    }
+  });
+
+  // 文件选择事件
+  voiceCloneEl.audioFileInput.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+      handleFileSelect(e.target.files[0]);
+    }
+  });
+
+  // 开始训练按钮
+  voiceCloneEl.startTraining.addEventListener('click', startVoiceTraining);
+
+  // 取消上传按钮
+  voiceCloneEl.cancelUpload.addEventListener('click', cancelUpload);
+
+  // 刷新声音列表按钮
+  voiceCloneEl.refreshVoices.addEventListener('click', refreshVoicesList);
+
+  // 初始化显示
+  renderTrainingStatus();
+  renderVoicesList();
+  
+  // 开始状态轮询
+  startStatusPolling();
+}
+
+// 处理文件选择
+function handleFileSelect(file) {
+  // 验证文件类型
+  const allowedTypes = ['audio/wav', 'audio/mpeg', 'audio/mp3'];
+  if (!allowedTypes.includes(file.type)) {
+    showError('请选择 WAV 或 MP3 格式的音频文件');
+    return;
+  }
+
+  // 验证文件大小（限制为 50MB）
+  const maxSize = 50 * 1024 * 1024;
+  if (file.size > maxSize) {
+    showError('文件大小不能超过 50MB');
+    return;
+  }
+
+  voiceClone.uploadedFile = file;
+  
+  // 显示上传表单
+  voiceCloneEl.uploadArea.style.display = 'none';
+  voiceCloneEl.uploadForm.style.display = 'block';
+  
+  // 设置默认声音名称
+  const defaultName = file.name.replace(/\.[^/.]+$/, ""); // 移除文件扩展名
+  voiceCloneEl.speakerName.value = defaultName;
+}
+
+// 取消上传
+function cancelUpload() {
+  voiceClone.uploadedFile = null;
+  voiceCloneEl.uploadArea.style.display = 'block';
+  voiceCloneEl.uploadForm.style.display = 'none';
+  voiceCloneEl.audioFileInput.value = '';
+  voiceCloneEl.speakerName.value = '';
+}
+
+// 开始声音训练
+async function startVoiceTraining() {
+  if (!voiceClone.uploadedFile) {
+    showError('请先选择音频文件');
+    return;
+  }
+
+  const speakerName = voiceCloneEl.speakerName.value.trim();
+  if (!speakerName) {
+    showError('请输入声音名称');
+    return;
+  }
+
+  setLoading(voiceCloneEl.startTraining, true);
+
+  try {
+    // 将文件转换为 base64
+    const audioBase64 = await fileToBase64(voiceClone.uploadedFile);
+    
+    // 获取文件格式
+    const audioFormat = voiceClone.uploadedFile.type.includes('wav') ? 'wav' : 'mp3';
+    
+    // 调用声音复刻API
+    const result = await voiceCloneAPI('upload', {
+      speaker_id: `speaker_${Date.now()}`,
+      audio_data: audioBase64,
+      audio_format: audioFormat,
+      language: voiceCloneEl.voiceLanguage.value,
+      model_type: parseInt(voiceCloneEl.modelType.value)
+    });
+
+    // 添加到训练任务列表
+    const task = {
+      speaker_id: result.speaker_id || `speaker_${Date.now()}`,
+      name: speakerName,
+      status: 'training',
+      progress: 0,
+      created_at: Date.now(),
+      language: voiceCloneEl.voiceLanguage.value,
+      model_type: parseInt(voiceCloneEl.modelType.value)
+    };
+    
+    voiceClone.trainingTasks.push(task);
+    storage.set('ve_voice_clone_tasks', voiceClone.trainingTasks);
+    
+    showSuccess('声音训练已开始，请等待训练完成');
+    
+    // 重置上传表单
+    cancelUpload();
+    
+    // 更新显示
+    renderTrainingStatus();
+    
+  } catch (error) {
+    showError(`训练启动失败: ${error.message}`);
+  } finally {
+    setLoading(voiceCloneEl.startTraining, false);
+  }
+}
+
+// 文件转 base64
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result.split(',')[1]; // 移除 data:audio/...;base64, 前缀
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// 渲染训练状态
+function renderTrainingStatus() {
+  if (voiceClone.trainingTasks.length === 0) {
+    voiceCloneEl.statusEmpty.style.display = 'block';
+    voiceCloneEl.statusList.style.display = 'none';
+    return;
+  }
+
+  voiceCloneEl.statusEmpty.style.display = 'none';
+  voiceCloneEl.statusList.style.display = 'block';
+
+  voiceCloneEl.statusList.innerHTML = voiceClone.trainingTasks.map(task => {
+    const statusClass = `status-${task.status}`;
+    const statusText = {
+      'training': '训练中',
+      'completed': '已完成',
+      'failed': '失败'
+    }[task.status] || task.status;
+
+    return `
+      <div class="status-item">
+        <div class="item-header">
+          <h4 class="item-name">${escapeHtml(task.name)}</h4>
+          <span class="item-status ${statusClass}">${statusText}</span>
+        </div>
+        ${task.status === 'training' ? `
+          <div class="item-progress">
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: ${task.progress}%"></div>
+            </div>
+          </div>
+        ` : ''}
+        <div class="item-meta">
+          <span>语言: ${task.language === 'zh' ? '中文' : '英文'}</span>
+          <span>模型: ${getModelTypeName(task.model_type)}</span>
+          <span>${new Date(task.created_at).toLocaleString()}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// 渲染已复刻声音列表
+function renderVoicesList() {
+  if (voiceClone.clonedVoices.length === 0) {
+    voiceCloneEl.voicesEmpty.style.display = 'block';
+    voiceCloneEl.voicesList.style.display = 'none';
+    return;
+  }
+
+  voiceCloneEl.voicesEmpty.style.display = 'none';
+  voiceCloneEl.voicesList.style.display = 'block';
+
+  voiceCloneEl.voicesList.innerHTML = voiceClone.clonedVoices.map(voice => {
+    return `
+      <div class="voice-item">
+        <div class="item-header">
+          <h4 class="item-name">${escapeHtml(voice.name)}</h4>
+          <span class="item-status status-completed">可用</span>
+        </div>
+        <div class="item-meta">
+          <span>语言: ${voice.language === 'zh' ? '中文' : '英文'}</span>
+          <span>模型: ${getModelTypeName(voice.model_type)}</span>
+          <span>${new Date(voice.created_at).toLocaleString()}</span>
+        </div>
+        <div class="voice-actions">
+          <button class="btn-use" onclick="useClonedVoice('${voice.speaker_id}', '${escapeHtml(voice.name)}')">使用此声音</button>
+          <button class="btn-delete" onclick="deleteClonedVoice('${voice.speaker_id}')">删除</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// 获取模型类型名称
+function getModelTypeName(modelType) {
+  const names = {
+    1: 'ICL',
+    2: 'DiT 标准版',
+    3: 'DiT 还原版'
+  };
+  return names[modelType] || `类型 ${modelType}`;
+}
+
+// 使用已复刻的声音
+function useClonedVoice(speakerId, voiceName) {
+  // 更新语音选择器
+  const option = document.createElement('option');
+  option.value = speakerId;
+  option.textContent = `🎤 ${voiceName} (已复刻)`;
+  
+  // 检查是否已存在
+  const existingOption = Array.from(el.voiceSelector.options).find(opt => opt.value === speakerId);
+  if (!existingOption) {
+    el.voiceSelector.appendChild(option);
+  }
+  
+  // 选中这个声音
+  el.voiceSelector.value = speakerId;
+  state.voiceType = speakerId;
+  storage.set('ve_voice_type', speakerId);
+  
+  showSuccess(`已切换到声音: ${voiceName}`);
+}
+
+// 删除已复刻的声音
+function deleteClonedVoice(speakerId) {
+  if (!confirm('确定要删除这个声音吗？此操作不可撤销。')) {
+    return;
+  }
+  
+  // 从列表中移除
+  voiceClone.clonedVoices = voiceClone.clonedVoices.filter(voice => voice.speaker_id !== speakerId);
+  storage.set('ve_cloned_voices', voiceClone.clonedVoices);
+  
+  // 从语音选择器中移除
+  const option = Array.from(el.voiceSelector.options).find(opt => opt.value === speakerId);
+  if (option) {
+    option.remove();
+  }
+  
+  // 如果当前选中的是被删除的声音，切换到默认声音
+  if (state.voiceType === speakerId) {
+    state.voiceType = 'zh_female_roumeinvyou_emo_v2_mars_bigtts';
+    el.voiceSelector.value = state.voiceType;
+    storage.set('ve_voice_type', state.voiceType);
+  }
+  
+  renderVoicesList();
+  showSuccess('声音已删除');
+}
+
+// 刷新声音列表
+async function refreshVoicesList() {
+  try {
+    setLoading(voiceCloneEl.refreshVoices, true);
+    
+    const voices = await getClonedVoices();
+    voiceClone.clonedVoices = voices;
+    storage.set('ve_cloned_voices', voices);
+    
+    renderVoicesList();
+    showSuccess('声音列表已刷新');
+  } catch (error) {
+    showError(`刷新失败: ${error.message}`);
+  } finally {
+    setLoading(voiceCloneEl.refreshVoices, false);
+  }
+}
+
+// 开始状态轮询
+function startStatusPolling() {
+  // 清除现有的轮询
+  if (voiceClone.statusPollingInterval) {
+    clearInterval(voiceClone.statusPollingInterval);
+  }
+  
+  // 每30秒检查一次训练状态
+  voiceClone.statusPollingInterval = setInterval(async () => {
+    const trainingTasks = voiceClone.trainingTasks.filter(task => task.status === 'training');
+    
+    for (const task of trainingTasks) {
+      try {
+        const status = await getTrainingStatus(task.speaker_id);
+        if (status) {
+          // 更新任务状态
+          const taskIndex = voiceClone.trainingTasks.findIndex(t => t.speaker_id === task.speaker_id);
+          if (taskIndex !== -1) {
+            voiceClone.trainingTasks[taskIndex].status = status.status;
+            voiceClone.trainingTasks[taskIndex].progress = status.progress || 0;
+            
+            // 如果训练完成，添加到已复刻声音列表
+            if (status.status === 'completed') {
+              const completedVoice = {
+                speaker_id: task.speaker_id,
+                name: task.name,
+                language: task.language,
+                model_type: task.model_type,
+                created_at: task.created_at
+              };
+              
+              // 检查是否已存在
+              const existingIndex = voiceClone.clonedVoices.findIndex(v => v.speaker_id === task.speaker_id);
+              if (existingIndex === -1) {
+                voiceClone.clonedVoices.push(completedVoice);
+                storage.set('ve_cloned_voices', voiceClone.clonedVoices);
+                renderVoicesList();
+                showSuccess(`声音 "${task.name}" 训练完成！`);
+              }
+            }
+            
+            storage.set('ve_voice_clone_tasks', voiceClone.trainingTasks);
+            renderTrainingStatus();
+          }
+        }
+      } catch (error) {
+        console.error(`检查任务 ${task.speaker_id} 状态失败:`, error);
+      }
+    }
+  }, 30000); // 30秒
+}
+
+// 停止状态轮询
+function stopStatusPolling() {
+  if (voiceClone.statusPollingInterval) {
+    clearInterval(voiceClone.statusPollingInterval);
+    voiceClone.statusPollingInterval = null;
+  }
+}
+
+// 页面卸载时停止轮询
+window.addEventListener('beforeunload', stopStatusPolling);
+
 init();
 
-
+// 初始化声音复刻功能
+initVoiceClone();
 
 // 为历史记录项生成语音
 async function generateAudioForHistoryItem(text) {

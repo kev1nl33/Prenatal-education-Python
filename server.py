@@ -73,6 +73,30 @@ class APIHandler(SimpleHTTPRequestHandler):
                     # 客户端已断开连接，忽略错误
                     print("Client disconnected before response could be sent")
                 return
+                
+        elif parsed_path.path == '/api/voice_clone':
+            # 直接调用 voice_clone.py 中 handler 的 do_POST，传入当前 self
+            try:
+                spec = importlib.util.spec_from_file_location("voice_clone", "api/voice_clone.py")
+                voice_clone_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(voice_clone_module)
+                voice_clone_module.handler.do_POST(self)
+                return
+            except Exception as e:
+                print(f"Error handling /api/voice_clone: {e}")
+                import traceback
+                traceback.print_exc()
+                try:
+                    self.send_response(500)
+                    self.send_header('Content-Type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    error_response = {"error": f"Internal server error: {str(e)}"}
+                    self.wfile.write(json.dumps(error_response).encode('utf-8'))
+                except (BrokenPipeError, ConnectionResetError):
+                    # 客户端已断开连接，忽略错误
+                    print("Client disconnected before response could be sent")
+                return
         else:
             self.send_error(404, "API endpoint not found")
     
@@ -80,16 +104,39 @@ class APIHandler(SimpleHTTPRequestHandler):
         parsed_path = urlparse(self.path)
         
         if parsed_path.path.startswith('/api/'):
-            print(f"[SERVER] GET {parsed_path.path} -> 405")
-            # API端点不支持GET请求
-            self.send_response(405)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Allow', 'POST, OPTIONS')
-            self.end_headers()
-            error_response = {"error": "Method not allowed. Use POST for API requests."}
-            self.wfile.write(json.dumps(error_response).encode('utf-8'))
-            return
+            # 特殊处理voice_clone API的GET请求
+            if parsed_path.path == '/api/voice_clone':
+                try:
+                    spec = importlib.util.spec_from_file_location("voice_clone", "api/voice_clone.py")
+                    voice_clone_module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(voice_clone_module)
+                    voice_clone_module.handler.do_GET(self)
+                    return
+                except Exception as e:
+                    print(f"Error handling GET /api/voice_clone: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    try:
+                        self.send_response(500)
+                        self.send_header('Content-Type', 'application/json')
+                        self.send_header('Access-Control-Allow-Origin', '*')
+                        self.end_headers()
+                        error_response = {"error": f"Internal server error: {str(e)}"}
+                        self.wfile.write(json.dumps(error_response).encode('utf-8'))
+                    except (BrokenPipeError, ConnectionResetError):
+                        print("Client disconnected before response could be sent")
+                    return
+            else:
+                print(f"[SERVER] GET {parsed_path.path} -> 405")
+                # 其他API端点不支持GET请求
+                self.send_response(405)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_header('Allow', 'POST, OPTIONS')
+                self.end_headers()
+                error_response = {"error": "Method not allowed. Use POST for API requests."}
+                self.wfile.write(json.dumps(error_response).encode('utf-8'))
+                return
         else:
             # 处理静态文件请求
             # 如果访问根路径，重定向到 index.html
@@ -119,6 +166,12 @@ class APIHandler(SimpleHTTPRequestHandler):
                     tts_module = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(tts_module)
                     tts_module.handler.do_OPTIONS(self)
+                    return
+                elif parsed_path.path == '/api/voice_clone':
+                    spec = importlib.util.spec_from_file_location("voice_clone", "api/voice_clone.py")
+                    voice_clone_module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(voice_clone_module)
+                    voice_clone_module.handler.do_OPTIONS(self)
                     return
             except Exception as e:
                 print(f"Error handling OPTIONS: {e}")

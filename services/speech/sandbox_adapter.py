@@ -1,6 +1,7 @@
 import os
 import time
 import random
+from typing import Dict, Any, List
 from .base import SpeechSynthesizer
 from .local_adapter import LocalSpeechAdapter
 
@@ -78,3 +79,97 @@ class SandboxSpeechAdapter(SpeechSynthesizer):
             "dry_run": True,
             "message": "This is a dry run estimate. No actual synthesis was performed."
         }
+    
+    def voice_clone(self, speaker_id: str, audio_data: bytes, audio_format: str = "wav", 
+                   language: str = "zh", model_type: int = 1, **kwargs) -> Dict[str, Any]:
+        """声音复刻（沙箱模式模拟）"""
+        # 模拟网络延迟
+        delay = random.uniform(0.5, 1.5)
+        time.sleep(delay)
+        
+        # 模拟偶发错误（10%概率）
+        if random.random() < 0.1:
+            error_types = [
+                "Audio quality too low",
+                "Unsupported audio format",
+                "Speaker ID already exists"
+            ]
+            error_msg = random.choice(error_types)
+            return {
+                "success": False,
+                "error": f"Simulated error: {error_msg}"
+            }
+        
+        # 模拟成功响应
+        task_id = f"sandbox_task_{int(time.time() * 1000)}"
+        return {
+            "success": True,
+            "speaker_id": speaker_id,
+            "task_id": task_id,
+            "status": "submitted",
+            "message": "Voice cloning task submitted successfully (sandbox mode)",
+            "estimated_duration": random.randint(300, 1800)  # 5-30分钟
+        }
+    
+    def get_voice_clone_status(self, speaker_id: str, **kwargs) -> Dict[str, Any]:
+        """查询声音复刻状态（沙箱模式模拟）"""
+        # 模拟网络延迟
+        delay = random.uniform(0.2, 0.8)
+        time.sleep(delay)
+        
+        # 模拟不同的训练状态
+        status_options = [
+            {"status": "training", "progress": random.randint(10, 90), "message": "Voice cloning in progress"},
+            {"status": "completed", "progress": 100, "message": "Voice cloning completed successfully"},
+            {"status": "failed", "progress": 0, "message": "Voice cloning failed due to insufficient audio quality"}
+        ]
+        
+        # 根据speaker_id的哈希值选择状态，保持一致性
+        status_index = hash(speaker_id) % len(status_options)
+        selected_status = status_options[status_index]
+        
+        return {
+            "success": True,
+            "speaker_id": speaker_id,
+            "status": selected_status["status"],
+            "progress": selected_status["progress"],
+            "message": selected_status["message"],
+            "sandbox_mode": True
+        }
+    
+    def list_cloned_voices(self, **kwargs) -> List[Dict[str, Any]]:
+        """获取已复刻的声音列表（沙箱模式模拟）"""
+        # 模拟网络延迟
+        delay = random.uniform(0.3, 1.0)
+        time.sleep(delay)
+        
+        # 返回模拟的声音列表
+        return [
+            {
+                "speaker_id": "sandbox_speaker_1",
+                "name": "沙箱测试声音1",
+                "status": "completed",
+                "created_at": "2024-01-01T10:00:00Z",
+                "language": "zh",
+                "model_type": 1,
+                "sandbox_mode": True
+            },
+            {
+                "speaker_id": "sandbox_speaker_2",
+                "name": "沙箱测试声音2",
+                "status": "training",
+                "created_at": "2024-01-02T14:30:00Z",
+                "language": "zh",
+                "model_type": 2,
+                "sandbox_mode": True
+            },
+            {
+                "speaker_id": "sandbox_speaker_3",
+                "name": "沙箱测试声音3",
+                "status": "failed",
+                "created_at": "2024-01-03T09:15:00Z",
+                "language": "en",
+                "model_type": 1,
+                "sandbox_mode": True
+            }
+        ]

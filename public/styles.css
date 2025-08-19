@@ -389,6 +389,324 @@ input:focus, select:focus, textarea:focus { border-color: #93C5FD; box-shadow: 0
 .history-actions { display: flex; gap: 8px; }
 .empty-state { color: #94A3B8; font-size: 14px; }
 
+/* 声音复刻功能样式 */
+.voice-clone-section {
+  margin-top: 24px;
+}
+
+.voice-clone-section h2 {
+  margin-bottom: 8px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.section-description {
+  margin: 0 0 20px;
+  color: #5a6c7d;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.voice-clone-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+  margin-top: 16px;
+}
+
+.voice-clone-card {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 16px;
+  padding: 20px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.voice-clone-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.card-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #2c3e50;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-icon {
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+
+.btn-icon svg {
+  width: 16px;
+  height: 16px;
+  color: #2c3e50;
+}
+
+/* 音频上传区域样式 */
+.upload-area {
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  padding: 32px 20px;
+  text-align: center;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.upload-area:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.upload-area.dragover {
+  border-color: #FF6B6B;
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.upload-icon {
+  width: 48px;
+  height: 48px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.upload-placeholder p {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.upload-placeholder small {
+  color: #5a6c7d;
+  font-size: 12px;
+}
+
+.upload-form {
+  margin-top: 20px;
+  display: grid;
+  gap: 16px;
+}
+
+.upload-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+/* 训练状态样式 */
+.status-empty,
+.voices-empty {
+  text-align: center;
+  padding: 32px 20px;
+  color: #5a6c7d;
+}
+
+.status-empty p,
+.voices-empty p {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.status-empty small,
+.voices-empty small {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.status-list,
+.voices-list {
+  display: grid;
+  gap: 12px;
+}
+
+.status-item,
+.voice-item {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.3s ease;
+}
+
+.status-item:hover,
+.voice-item:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.item-name {
+  font-weight: 600;
+  color: #2c3e50;
+  margin: 0;
+}
+
+.item-status {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.status-training {
+  background: rgba(255, 193, 7, 0.2);
+  color: #856404;
+}
+
+.status-completed {
+  background: rgba(40, 167, 69, 0.2);
+  color: #155724;
+}
+
+.status-failed {
+  background: rgba(220, 53, 69, 0.2);
+  color: #721c24;
+}
+
+.item-progress {
+  margin: 8px 0;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #FF6B6B, #FF5252);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.item-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #5a6c7d;
+  margin-top: 8px;
+}
+
+.voice-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.btn-use {
+  background: linear-gradient(135deg, #28a745, #20c997);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-use:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.btn-delete {
+  background: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-delete:hover {
+  background: rgba(220, 53, 69, 0.2);
+  transform: translateY(-1px);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .voice-clone-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .upload-actions {
+    flex-direction: column;
+  }
+  
+  .voice-actions {
+    flex-direction: column;
+  }
+  
+  .item-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .item-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}
+
 /* 模态框样式 */
 .modal {
   position: fixed;

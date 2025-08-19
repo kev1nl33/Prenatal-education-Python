@@ -202,6 +202,108 @@
                     </div>
                 </div>
             </section>
+
+            <!-- 声音复刻功能模块 -->
+            <section class="voice-clone-section">
+                <h2>🎤 声音复刻</h2>
+                <p class="section-description">上传您的声音样本，训练专属的AI语音模型，让胎教内容更加个性化</p>
+                
+                <!-- 声音复刻卡片网格 -->
+                <div class="voice-clone-grid">
+                    <!-- 音频上传卡片 -->
+                    <div class="voice-clone-card upload-card">
+                        <div class="card-header">
+                            <div class="card-icon">🎙️</div>
+                            <h3>上传音频</h3>
+                        </div>
+                        <div class="card-content">
+                            <div class="upload-area" id="uploadArea">
+                                <div class="upload-placeholder">
+                                    <svg class="upload-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <path d="M7 10L12 5L17 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <path d="M12 5V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                    <p>点击或拖拽音频文件到此处</p>
+                                    <small>支持 WAV、MP3 格式，建议时长 10-60 秒</small>
+                                </div>
+                                <input type="file" id="audioFileInput" accept=".wav,.mp3" style="display: none;">
+                            </div>
+                            
+                            <div class="upload-form" id="uploadForm" style="display: none;">
+                                <div class="form-group">
+                                    <label for="speakerName">声音名称:</label>
+                                    <input type="text" id="speakerName" placeholder="例如：妈妈的声音" maxlength="20">
+                                </div>
+                                <div class="form-group">
+                                    <label for="voiceLanguage">语言:</label>
+                                    <select id="voiceLanguage">
+                                        <option value="zh">中文</option>
+                                        <option value="en">英文</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="modelType">模型类型:</label>
+                                    <select id="modelType">
+                                        <option value="1">ICL (快速训练)</option>
+                                        <option value="2">DiT 标准版 (高质量)</option>
+                                        <option value="3">DiT 还原版 (最高还原度)</option>
+                                    </select>
+                                </div>
+                                <div class="upload-actions">
+                                    <button id="startTraining" class="btn btn-primary">
+                                        <span class="btn-text">开始训练</span>
+                                        <div class="loading-spinner" style="display: none;"></div>
+                                    </button>
+                                    <button id="cancelUpload" class="btn btn-outline">取消</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 训练状态卡片 -->
+                    <div class="voice-clone-card status-card">
+                        <div class="card-header">
+                            <div class="card-icon">⏳</div>
+                            <h3>训练状态</h3>
+                        </div>
+                        <div class="card-content">
+                            <div class="status-empty" id="statusEmpty">
+                                <p>暂无训练任务</p>
+                                <small>上传音频文件开始训练您的专属声音</small>
+                            </div>
+                            <div class="status-list" id="statusList" style="display: none;">
+                                <!-- 训练状态项将动态添加到这里 -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 已复刻声音列表卡片 -->
+                    <div class="voice-clone-card voices-card">
+                        <div class="card-header">
+                            <div class="card-icon">🎵</div>
+                            <h3>我的声音</h3>
+                            <button id="refreshVoices" class="btn-icon" title="刷新列表">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M1 4V10H7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M23 20V14H17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M20.49 9C19.9828 7.56678 19.1209 6.28392 17.9845 5.27304C16.8482 4.26216 15.4745 3.55682 13.9917 3.21834C12.5089 2.87986 10.9652 2.91902 9.50481 3.33329C8.04437 3.74757 6.70481 4.52433 5.60999 5.59L1 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M3.51001 15C4.01716 16.4332 4.87906 17.7161 6.01543 18.727C7.1518 19.7378 8.52547 20.4432 10.0083 20.7817C11.4911 21.1201 13.0348 21.081 14.4952 20.6667C15.9556 20.2524 17.2952 19.4757 18.39 18.41L23 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="card-content">
+                            <div class="voices-empty" id="voicesEmpty">
+                                <p>暂无已训练的声音</p>
+                                <small>完成声音训练后，您的专属声音将显示在这里</small>
+                            </div>
+                            <div class="voices-list" id="voicesList" style="display: none;">
+                                <!-- 已复刻声音项将动态添加到这里 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </main>
     </div>
 

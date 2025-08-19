@@ -4,7 +4,8 @@ import hashlib
 import struct
 import wave
 import io
-from typing import Dict, Any
+import time
+from typing import Dict, Any, List
 from .base import SpeechSynthesizer
 
 
@@ -129,3 +130,94 @@ class LocalSpeechAdapter(SpeechSynthesizer):
     def get_provider_name(self) -> str:
         """获取提供商名称"""
         return "local"
+    
+    def voice_clone(self, speaker_id: str, audio_data: bytes, audio_format: str = "wav", 
+                   language: str = "zh", model_type: int = 1, **kwargs) -> Dict[str, Any]:
+        """声音复刻（本地模式占位符实现）"""
+        # 本地模式直接返回成功，不进行实际的声音复刻
+        task_id = f"local_task_{int(time.time() * 1000)}"
+        
+        # 可以选择将音频数据保存到本地用于调试
+        if kwargs.get("save_audio", False):
+            audio_dir = os.path.join(self.cache_dir, "voice_clones")
+            os.makedirs(audio_dir, exist_ok=True)
+            audio_file = os.path.join(audio_dir, f"{speaker_id}.{audio_format}")
+            try:
+                with open(audio_file, 'wb') as f:
+                    f.write(audio_data)
+                print(f"[LOCAL DEBUG] Audio saved to: {audio_file}")
+            except Exception as e:
+                print(f"[LOCAL DEBUG] Failed to save audio: {e}")
+        
+        return {
+            "success": True,
+            "speaker_id": speaker_id,
+            "task_id": task_id,
+            "status": "completed",  # 本地模式直接标记为完成
+            "message": "Voice cloning completed (local mode - placeholder implementation)",
+            "local_mode": True
+        }
+    
+    def get_voice_clone_status(self, speaker_id: str, **kwargs) -> Dict[str, Any]:
+        """查询声音复刻状态（本地模式占位符实现）"""
+        # 本地模式总是返回已完成状态
+        return {
+            "success": True,
+            "speaker_id": speaker_id,
+            "status": "completed",
+            "progress": 100,
+            "message": "Voice cloning completed (local mode)",
+            "local_mode": True
+        }
+    
+    def list_cloned_voices(self, **kwargs) -> List[Dict[str, Any]]:
+        """获取已复刻的声音列表（本地模式占位符实现）"""
+        # 检查本地是否有保存的声音文件
+        voices = []
+        audio_dir = os.path.join(self.cache_dir, "voice_clones")
+        
+        if os.path.exists(audio_dir):
+            try:
+                for filename in os.listdir(audio_dir):
+                    if filename.endswith(('.wav', '.mp3', '.m4a')):
+                        speaker_id = os.path.splitext(filename)[0]
+                        file_path = os.path.join(audio_dir, filename)
+                        stat = os.stat(file_path)
+                        
+                        voices.append({
+                            "speaker_id": speaker_id,
+                            "name": f"本地声音 - {speaker_id}",
+                            "status": "completed",
+                            "created_at": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(stat.st_ctime)),
+                            "language": "zh",
+                            "model_type": 1,
+                            "local_mode": True,
+                            "file_path": file_path
+                        })
+            except Exception as e:
+                print(f"[LOCAL DEBUG] Error listing voice clones: {e}")
+        
+        # 如果没有本地文件，返回默认的演示声音
+        if not voices:
+            voices = [
+                {
+                    "speaker_id": "local_demo_1",
+                    "name": "本地演示声音1",
+                    "status": "completed",
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "language": "zh",
+                    "model_type": 1,
+                    "local_mode": True
+                },
+                {
+                    "speaker_id": "local_demo_2",
+                    "name": "本地演示声音2",
+                    "status": "completed",
+                    "created_at": "2024-01-02T00:00:00Z",
+                    "language": "en",
+                    "model_type": 2,
+                    "local_mode": True
+                }
+            ]
+        
+        return voices

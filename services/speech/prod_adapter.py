@@ -6,7 +6,7 @@ import urllib.request
 import urllib.error
 import ssl
 import base64
-from typing import Dict, Any
+from typing import Dict, Any, List
 from .base import SpeechSynthesizer
 
 
@@ -18,6 +18,8 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
         self.app_id = os.environ.get('TTS_APP_ID', '')
         self.access_token = os.environ.get('TTS_ACCESS_TOKEN', '')
         self.api_url = os.environ.get('TTS_API_URL', 'https://openspeech.bytedance.com/api/v1/tts')
+        # 声音复刻API可能使用不同的端点
+        self.voice_clone_api_url = os.environ.get('VOICE_CLONE_API_URL', 'https://openspeech.bytedance.com/api/v1/tts')
         
         # 价格配置
         self.price_per_1k_char = float(os.environ.get('TTS_PRICE_PER_1K_CHAR', '0.02'))
@@ -428,3 +430,237 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
     def get_provider_name(self) -> str:
         """获取提供商名称"""
         return "volcengine"
+    
+    def voice_clone(self, speaker_id: str, audio_data: bytes, audio_format: str = "wav", 
+                   language: str = "zh", model_type: int = 1, **kwargs) -> Dict[str, Any]:
+        """声音复刻"""
+        try:
+            # 构建请求payload
+            payload = {
+                "app": {
+                    "appid": self.app_id,
+                    "token": self.access_token,
+                    "cluster": "volcano_tts"
+                },
+                "user": {
+                    "uid": "test_user"
+                },
+                "audio": {
+                    "voice_type": "custom",
+                    "encoding": "wav",
+                    "speed_ratio": 1.0,
+                    "volume_ratio": 1.0,
+                    "pitch_ratio": 1.0
+                },
+                "request": {
+                    "reqid": f"voice_clone_{int(time.time() * 1000)}",
+                    "operation": "submit",
+                    "speaker_id": speaker_id,
+                    "audios": [base64.b64encode(audio_data).decode('utf-8')],
+                    "source": "api",
+                    "language": language,
+                    "model_type": model_type,
+                    "extra_params": kwargs.get("extra_params", {})
+                }
+            }
+            
+            print(f"[VOICE_CLONE DEBUG] Voice clone payload: {json.dumps(payload, indent=2, ensure_ascii=False)}")
+            
+            # 发送请求
+            req_data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(
+                self.voice_clone_api_url,
+                data=req_data,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer;{self.access_token}",
+                    "Resource-Id": self.app_id  # 声音复刻2.0需要Resource-Id头
+                }
+            )
+            
+            ctx = self._build_ssl_context()
+            with urllib.request.urlopen(req, timeout=self.timeout, context=ctx) as response:
+                response_data = response.read()
+                json_response = json.loads(response_data.decode("utf-8"))
+                
+                print(f"[VOICE_CLONE DEBUG] Voice clone response: {json.dumps(json_response, indent=2, ensure_ascii=False)}")
+                
+                if json_response.get("code") == 0:
+                    return {
+                        "success": True,
+                        "speaker_id": speaker_id,
+                        "task_id": json_response.get("reqid", payload["request"]["reqid"]),
+                        "status": "submitted",
+                        "message": "Voice cloning task submitted successfully"
+                    }
+                else:
+                    error_msg = json_response.get("message", "Unknown error")
+                    error_code = json_response.get("code")
+                    print(f"[VOICE_CLONE ERROR] API returned error code {error_code}: {error_msg}")
+                    return {
+                        "success": False,
+                        "error": f"Voice clone failed: {error_msg}",
+                        "code": error_code
+                    }
+                    
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode('utf-8') if e.fp else str(e)
+            print(f"[VOICE_CLONE ERROR] HTTP {e.code}: {error_body}")
+            if e.code == 400:
+                return {
+                    "success": False,
+                    "error": f"Bad Request (400): Invalid parameters or format. Details: {error_body}"
+                }
+            elif e.code == 401:
+                return {
+                    "success": False,
+                    "error": "Authentication failed: Invalid access token"
+                }
+            elif e.code == 403:
+                return {
+                    "success": False,
+                    "error": "Access forbidden: Check your permissions"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"HTTP {e.code}: {error_body}"
+                }
+        except Exception as e:
+            print(f"[VOICE_CLONE ERROR] {str(e)}")
+            return {
+                "success": False,
+                "error": f"Voice clone request failed: {str(e)}"
+            }
+    
+    def get_voice_clone_status(self, speaker_id: str, **kwargs) -> Dict[str, Any]:
+        """查询声音复刻状态"""
+        try:
+            # 构建查询请求payload
+            payload = {
+                "app": {
+                    "appid": self.app_id,
+                    "token": self.access_token,
+                    "cluster": "volcano_tts"
+                },
+                "user": {
+                    "uid": "test_user"
+                },
+                "audio": {
+                    "voice_type": "custom",
+                    "encoding": "wav"
+                },
+                "request": {
+                    "reqid": kwargs.get("task_id", f"status_{int(time.time() * 1000)}"),
+                    "operation": "query",
+                    "speaker_id": speaker_id,
+                    "text": "",  # query操作需要text字段
+                    "text_type": "plain",
+                    "enable_subtitle": False
+                }
+            }
+            
+            print(f"[VOICE_CLONE DEBUG] Status query payload: {json.dumps(payload, indent=2, ensure_ascii=False)}")
+            
+            # 发送请求
+            req_data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(
+                self.voice_clone_api_url,
+                data=req_data,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer;{self.access_token}",
+                    "Resource-Id": self.app_id  # 声音复刻2.0需要Resource-Id头
+                }
+            )
+            
+            ctx = self._build_ssl_context()
+            with urllib.request.urlopen(req, timeout=self.timeout, context=ctx) as response:
+                response_data = response.read()
+                json_response = json.loads(response_data.decode("utf-8"))
+                
+                print(f"[VOICE_CLONE DEBUG] Status response: {json.dumps(json_response, indent=2, ensure_ascii=False)}")
+                
+                code = json_response.get("code")
+                if code == 0:
+                    return {
+                        "success": True,
+                        "speaker_id": speaker_id,
+                        "status": "completed",
+                        "progress": 100,
+                        "message": "Voice cloning completed successfully"
+                    }
+                elif code == 3000 or code == 3001:
+                    return {
+                        "success": True,
+                        "speaker_id": speaker_id,
+                        "status": "training",
+                        "progress": 50,
+                        "message": "Voice cloning in progress"
+                    }
+                else:
+                    error_msg = json_response.get("message", "Unknown error")
+                    print(f"[VOICE_CLONE ERROR] Status query API returned error code {code}: {error_msg}")
+                    return {
+                        "success": False,
+                        "error": f"Status query failed: {error_msg}",
+                        "code": code
+                    }
+                    
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode('utf-8') if e.fp else str(e)
+            print(f"[VOICE_CLONE ERROR] Status query HTTP {e.code}: {error_body}")
+            if e.code == 400:
+                return {
+                    "success": False,
+                    "error": f"Bad Request (400): Invalid parameters or format. Details: {error_body}"
+                }
+            elif e.code == 401:
+                return {
+                    "success": False,
+                    "error": "Authentication failed: Invalid access token"
+                }
+            elif e.code == 403:
+                return {
+                    "success": False,
+                    "error": "Access forbidden: Check your permissions"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"HTTP {e.code}: {error_body}"
+                }
+        except Exception as e:
+            print(f"[VOICE_CLONE ERROR] {str(e)}")
+            return {
+                "success": False,
+                "error": f"Status query failed: {str(e)}"
+            }
+    
+    def list_cloned_voices(self, **kwargs) -> List[Dict[str, Any]]:
+        """获取已复刻的声音列表"""
+        try:
+            # 火山引擎API可能没有直接的列表接口，这里返回模拟数据
+            # 实际实现中可能需要维护一个本地的声音列表或使用其他API
+            return [
+                {
+                    "speaker_id": "demo_speaker_1",
+                    "name": "演示声音1",
+                    "status": "completed",
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "language": "zh",
+                    "model_type": 1
+                },
+                {
+                    "speaker_id": "demo_speaker_2",
+                    "name": "演示声音2",
+                    "status": "training",
+                    "created_at": "2024-01-02T00:00:00Z",
+                    "language": "zh",
+                    "model_type": 2
+                }
+            ]
+            
+        except Exception as e:
+            print(f"[VOICE_CLONE ERROR] {str(e)}")
+            return []
