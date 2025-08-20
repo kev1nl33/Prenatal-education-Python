@@ -818,7 +818,7 @@ function buildPrompt() {
 
   const moodMap = {
     happy: '愉悦开心',
-    neutral: '平和中性'
+    neutral: '平中和性'
   };
 
   const durationMap = {
@@ -844,22 +844,17 @@ function buildPrompt() {
 
 
 function setLoading(button, loading) {
+  if (!button) return;
   const text = button.querySelector('.btn-text');
   const spinner = button.querySelector('.loading-spinner');
   if (loading) {
     button.disabled = true;
-    text.style.display = 'none';
-    if (!spinner) {
-      return;
-    }
-    spinner.style.display = 'inline-block';
+    if (text) text.style.display = 'none';
+    if (spinner) spinner.style.display = 'inline-block';
   } else {
     button.disabled = false;
-    text.style.display = 'inline';
-    if (!spinner) {
-      return;
-    }
-    spinner.style.display = 'none';
+    if (text) text.style.display = 'inline';
+    if (spinner) spinner.style.display = 'none';
   }
 }
 
@@ -1314,12 +1309,22 @@ function renderTrainingStatus() {
   voiceCloneEl.statusList.style.display = 'block';
 
   voiceCloneEl.statusList.innerHTML = voiceClone.trainingTasks.map(task => {
-    const statusClass = `status-${task.status}`;
+    const normalized = (task.status || '').toLowerCase();
+    // 将未知/排队/等待状态统一按“训练中”样式展示
+    const statusClass = (
+      normalized === 'completed' ? 'status-completed' :
+      normalized === 'failed' ? 'status-failed' :
+      'status-training'
+    );
     const statusText = {
       'training': '训练中',
+      'processing': '训练中',
+      'queued': '排队中',
+      'pending': '排队中',
+      'unknown': '处理中',
       'completed': '已完成',
       'failed': '失败'
-    }[task.status] || task.status;
+    }[normalized] || '处理中';
 
     return `
       <div class="status-item">
@@ -1327,10 +1332,10 @@ function renderTrainingStatus() {
           <h4 class="item-name">${escapeHtml(task.name)}</h4>
           <span class="item-status ${statusClass}">${statusText}</span>
         </div>
-        ${task.status === 'training' ? `
+        ${normalized === 'training' || normalized === 'processing' || normalized === 'queued' || normalized === 'pending' || normalized === 'unknown' ? `
           <div class="item-progress">
             <div class="progress-bar">
-              <div class="progress-fill" style="width: ${task.progress}%"></div>
+              <div class="progress-fill" style="width: ${task.progress || 0}%"></div>
             </div>
           </div>
         ` : ''}
