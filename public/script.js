@@ -530,6 +530,10 @@ function initHistoryModal() {
 
 // 显示历史记录模态框
 function showHistoryModal() {
+  // 从localStorage重新加载最新的历史数据
+  state.history = storage.get('ve_history', []);
+  console.log('Loading history data:', state.history);
+  
   el.historyModal.style.display = 'flex';
   document.body.style.overflow = 'hidden';
   renderHistoryInModal();
@@ -544,6 +548,8 @@ function hideHistoryModal() {
 // 在模态框中渲染历史记录
 function renderHistoryInModal() {
   const historyList = el.historyList;
+  console.log('Rendering history in modal, count:', state.history.length);
+  console.log('History data:', state.history);
 
   if (state.history.length === 0) {
     historyList.innerHTML = '<p class="empty-state">暂无历史记录</p>';
@@ -587,7 +593,54 @@ function getContentTypeLabel(type) {
 }
 
 // 加载历史记录项
+function loadHistoryItem(index) {
+  try {
+    const item = state.history && state.history[index];
+    if (!item) {
+      showError('未找到该条历史记录');
+      return;
+    }
+    const text = (item.content !== null ? item.content : item.text) || '';
 
+    state.lastContent = text;
+    el.contentText.textContent = text;
+    checkTextLength(text);
+    el.resultSection.style.display = 'block';
+    el.audioPlayer.style.display = 'none';
+
+    hideHistoryModal();
+    showSuccess('已载入历史文本，可以直接生成语音');
+  } catch (e) {
+    console.error(e);
+    showError('载入历史记录失败');
+  }
+}
+
+function deleteHistoryItem(index) {
+  try {
+    if (!Array.isArray(state.history)) state.history = storage.get('ve_history', []);
+    if (index < 0 || index >= state.history.length) {
+      showError('无法删除：索引无效');
+      return;
+    }
+
+    // 删除并持久化
+    state.history.splice(index, 1);
+    storage.set('ve_history', state.history);
+
+    // 重新渲染模态框与主列表
+    renderHistoryInModal();
+    renderHistory();
+    showSuccess('已删除该条历史记录');
+  } catch (e) {
+    console.error(e);
+    showError('删除历史记录失败');
+  }
+}
+
+// 暴露到全局，供内联 onclick 调用
+window.loadHistoryItem = loadHistoryItem;
+window.deleteHistoryItem = deleteHistoryItem;
 
 // 初始化文本展开功能
 function initTextExpansion() {
@@ -792,6 +845,13 @@ el.generateAudio.addEventListener('click', async() => {
     el.audioElement.src = url;
     el.audioPlayer.style.display = 'flex';
 
+    // 将历史记录的文本设置为当前内容
+    state.lastContent = text;
+    el.contentText.textContent = text;
+    checkTextLength(text); // 检查文本长度并显示/隐藏展开按钮
+    el.resultSection.style.display = 'block';
+
+    showSuccess('历史记录语音生成成功！');
   } catch (e) {
     console.error(e);
     alert('生成语音失败：' + (e.message || '请稍后重试'));
@@ -1582,4 +1642,62 @@ async function generateAudioForHistoryItem(text) {
     console.error(e);
     alert('生成语音失败：' + (e.message || '请稍后重试'));
   }
+}
+
+// 扩展 voiceCloneEl 绑定新增的手动添加控件
+voiceCloneEl.existingSpeakerId = document.getElementById('existingSpeakerId');
+voiceCloneEl.existingSpeakerName = document.getElementById('existingSpeakerName');
+voiceCloneEl.existingVoiceLanguage = document.getElementById('existingVoiceLanguage');
+voiceCloneEl.existingModelType = document.getElementById('existingModelType');
+voiceCloneEl.addExistingVoiceBtn = document.getElementById('addExistingVoiceBtn');
+
+// 绑定点击事件：添加已有的声音ID
+if (voiceCloneEl.addExistingVoiceBtn) {
+  voiceCloneEl.addExistingVoiceBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    const speakerId = (voiceCloneEl.existingSpeakerId?.value || '').trim();
+    const name = (voiceCloneEl.existingSpeakerName?.value || '').trim() || speakerId;
+    const language = voiceCloneEl.existingVoiceLanguage?.value || 'zh';
+    const model_type = parseInt(voiceCloneEl.existingModelType?.value || '1', 10);
+
+    if (!speakerId) {
+      showError('请先输入声音ID');
+      return;
+    }
+    // 简单校验：S_ 开头更像平台ID，但不过分限制
+    if (!/^S_[A-Za-z0-9]+/.test(speakerId)) {
+      if (!confirm('该ID看起来不像平台生成的ID（通常以 S_ 开头），是否继续添加？')) {
+        return;
+      }
+    }
+
+    // 去重
+    const exists = voiceClone.clonedVoices.some(v => v.speaker_id === speakerId);
+    if (exists) {
+      showError('该声音ID已在列表中');
+      return;
+    }
+
+    const now = Date.now();
+    const newVoice = {
+      speaker_id: speakerId,
+      name,
+      language,
+      model_type,
+      created_at: now
+    };
+
+    voiceClone.clonedVoices.push(newVoice);
+    storage.set('ve_cloned_voices', voiceClone.clonedVoices);
+    renderVoicesList();
+
+    // 同步到语音选择器并选中
+    useClonedVoice(speakerId, name);
+
+    // 清空输入框
+    if (voiceCloneEl.existingSpeakerId) voiceCloneEl.existingSpeakerId.value = '';
+    if (voiceCloneEl.existingSpeakerName) voiceCloneEl.existingSpeakerName.value = '';
+
+    showSuccess('已添加到我的声音列表');
+  });
 }

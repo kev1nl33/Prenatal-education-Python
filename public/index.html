@@ -297,6 +297,31 @@
                                 <p>暂无已训练的声音</p>
                                 <small>完成声音训练后，您的专属声音将显示在这里</small>
                             </div>
+
+                            <!-- 手动添加已有的声音ID -->
+                            <div class="manual-add" style="margin: 10px 0 16px; padding: 10px; background: rgba(255,255,255,0.06); border-radius: 8px;">
+                                <div class="form-row" style="display:flex; gap:8px; margin-bottom:8px;">
+                                    <input id="existingSpeakerId" type="text" placeholder="输入已有的声音ID，例如 S_xxx" style="flex:2;" />
+                                    <input id="existingSpeakerName" type="text" placeholder="显示名称（可选）" style="flex:1;" />
+                                </div>
+                                <div class="form-row" style="display:flex; gap:8px; align-items:center;">
+                                    <select id="existingVoiceLanguage" style="flex:1;">
+                                        <option value="zh">中文</option>
+                                        <option value="en">英文</option>
+                                    </select>
+                                    <select id="existingModelType" style="flex:1;">
+                                        <option value="1">ICL</option>
+                                        <option value="2">DiT 标准版</option>
+                                        <option value="3">DiT 还原版</option>
+                                    </select>
+                                    <button id="addExistingVoiceBtn" class="btn btn-outline" style="flex:none;">
+                                        <span class="btn-text">添加已有ID</span>
+                                        <div class="loading-spinner" style="display:none;"></div>
+                                    </button>
+                                </div>
+                                <small style="opacity:0.8;">若你已在平台上训练好声音，可直接输入声音ID加入并使用。</small>
+                            </div>
+
                             <div class="voices-list" id="voicesList" style="display: none;">
                                 <!-- 已复刻声音项将动态添加到这里 -->
                             </div>
