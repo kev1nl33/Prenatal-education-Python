@@ -224,6 +224,22 @@ function getVoiceTypeName(voiceType) {
     'zh_female_shuangkuaisisi_emo_v2_mars_bigtts': '爽快思思（多情感）',
     'zh_male_yangguangqingnian_emo_v2_mars_bigtts': '阳光青年（多情感）'
   };
+  
+  // 检查是否为复刻声音
+  if (voiceType && !voiceNames[voiceType]) {
+    // 尝试从复刻声音列表中查找
+    const clonedVoice = voiceClone.clonedVoices.find(voice => voice.speaker_id === voiceType);
+    if (clonedVoice) {
+      return `🎤 ${clonedVoice.name} (已复刻)`;
+    }
+    
+    // 尝试从语音选择器中查找
+    const option = Array.from(el.voiceSelector.options).find(opt => opt.value === voiceType);
+    if (option) {
+      return option.textContent;
+    }
+  }
+  
   return voiceNames[voiceType] || '默认语音';
 }
 
@@ -364,6 +380,9 @@ const state = {
   modelEndpoint: storage.get('ve_model_endpoint', ''),
   ttsAppId: storage.get('ve_tts_appid', ''),
   accessToken: storage.get('ve_access_token', ''),
+  voiceCloneAppId: storage.get('ve_voice_clone_appid', ''),
+  voiceCloneAccessToken: storage.get('ve_voice_clone_access_token', ''),
+  voiceCloneSecretKey: storage.get('ve_voice_clone_secret_key', ''),
   voiceType: storage.get('ve_voice_type', 'zh_female_roumeinvyou_emo_v2_mars_bigtts'),
   testMode: storage.get('ve_test_mode', false),
   lastContent: '',
@@ -379,6 +398,9 @@ const el = {
   modelEndpoint: document.getElementById('modelEndpoint'),
   ttsAppId: document.getElementById('appId'),
   accessToken: document.getElementById('accessToken'),
+  voiceCloneAppId: document.getElementById('voiceCloneAppId'),
+  voiceCloneAccessToken: document.getElementById('voiceCloneAccessToken'),
+  voiceCloneSecretKey: document.getElementById('voiceCloneSecretKey'),
   testMode: document.getElementById('testMode'),
   saveConfig: document.getElementById('saveConfig'),
   contentType: document.getElementById('contentType'),
@@ -437,6 +459,9 @@ function init() {
   el.modelEndpoint.value = state.modelEndpoint;
   el.ttsAppId.value = state.ttsAppId;
   el.accessToken.value = state.accessToken;
+  el.voiceCloneAppId.value = state.voiceCloneAppId;
+  el.voiceCloneAccessToken.value = state.voiceCloneAccessToken;
+  el.voiceCloneSecretKey.value = state.voiceCloneSecretKey;
   el.testMode.checked = state.testMode;
 
   // 初始化内容卡片选择
@@ -444,6 +469,9 @@ function init() {
 
   // 初始化语音选择器（下拉框）
   initVoiceSelector();
+  
+  // 加载复刻声音到语音选择器
+  loadClonedVoicesToSelector();
 
   // 初始化历史记录功能
   initHistoryModal();
@@ -509,6 +537,29 @@ function initVoiceSelector() {
     // 保存到localStorage
     storage.set('ve_voice_type', selectedVoice);
   });
+}
+
+// 加载复刻声音到语音选择器
+function loadClonedVoicesToSelector() {
+  // 获取已保存的复刻声音列表
+  const clonedVoices = storage.get('ve_cloned_voices', []);
+  
+  // 为每个复刻声音添加选项
+  clonedVoices.forEach(voice => {
+    // 检查是否已存在该选项
+    const existingOption = Array.from(el.voiceSelector.options).find(opt => opt.value === voice.speaker_id);
+    if (!existingOption) {
+      const option = document.createElement('option');
+      option.value = voice.speaker_id;
+      option.textContent = `🎤 ${voice.name} (已复刻)`;
+      el.voiceSelector.appendChild(option);
+    }
+  });
+  
+  // 重新设置当前选中的语音（确保复刻声音能正确选中）
+  if (state.voiceType) {
+    el.voiceSelector.value = state.voiceType;
+  }
 }
 
 // 初始化历史记录模态框
@@ -725,6 +776,9 @@ el.saveConfig.addEventListener('click', () => {
   state.modelEndpoint = el.modelEndpoint.value.trim();
   state.ttsAppId = el.ttsAppId.value.trim();
   state.accessToken = el.accessToken.value.trim();
+  state.voiceCloneAppId = el.voiceCloneAppId.value.trim();
+  state.voiceCloneAccessToken = el.voiceCloneAccessToken.value.trim();
+  state.voiceCloneSecretKey = el.voiceCloneSecretKey.value.trim();
   // 语音类型现在从voiceSelector获取
   state.voiceType = el.voiceSelector.value;
   state.testMode = el.testMode.checked;
@@ -740,6 +794,9 @@ el.saveConfig.addEventListener('click', () => {
   storage.set('ve_model_endpoint', state.modelEndpoint);
   storage.set('ve_tts_appid', state.ttsAppId);
   storage.set('ve_access_token', state.accessToken);
+  storage.set('ve_voice_clone_appid', state.voiceCloneAppId);
+  storage.set('ve_voice_clone_access_token', state.voiceCloneAccessToken);
+  storage.set('ve_voice_clone_secret_key', state.voiceCloneSecretKey);
   storage.set('ve_voice_type', state.voiceType);
   storage.set('ve_test_mode', state.testMode);
 
@@ -799,9 +856,9 @@ async function previewContent() {
   
   setLoading(el.previewAudio, true);
   try {
-    // 截取前30个字符作为试听内容
-    const previewText = state.lastContent.substring(0, 30);
-    if (previewText.length < 10) {
+    // 截取前10个字符作为试听内容
+    const previewText = state.lastContent.substring(0, 10);
+    if (previewText.length < 5) {
       throw new Error('生成的内容太短，无法进行试听');
     }
     
@@ -822,7 +879,8 @@ async function previewContent() {
       quality: 'draft'
     };
     
-    const data = await ttsSynthesize(payload);
+    // 使用声音复刻专用TTS函数
+    const data = await voiceCloneTTSSynthesize(payload);
     
     let audioBase64;
     let blob;
@@ -863,7 +921,7 @@ async function previewContent() {
     state.lastPreviewUrl = url;
     
     // 显示试听内容
-    el.previewText.textContent = `"${previewText}${state.lastContent.length > 30 ? '...' : ''}"`;
+    el.previewText.textContent = `"${previewText}${state.lastContent.length > 10 ? '...' : ''}"`;
     el.previewAudioElement.src = url;
     el.previewPlayer.style.display = 'block';
     
@@ -923,7 +981,9 @@ el.generateAudio.addEventListener('click', async() => {
       emotion: el.mood.value === 'happy' ? 'happy' : 'neutral',
       quality: 'draft'
     };
-    const data = await ttsSynthesize(payload);
+    
+    // 使用声音复刻专用TTS函数
+    const data = await voiceCloneTTSSynthesize(payload);
 
     let audioBase64;
     let blob;
@@ -1603,6 +1663,50 @@ function useClonedVoice(speakerId, voiceName) {
   showSuccess(`已切换到声音: ${voiceName}`);
 }
 
+// 声音复刻专用TTS函数
+async function voiceCloneTTSSynthesize(payload) {
+  try {
+    // 检查是否配置了声音复刻API
+    if (!state.voiceCloneAppId || !state.voiceCloneAccessToken) {
+      // 如果没有配置声音复刻API，使用普通TTS API
+      return await ttsSynthesize(payload);
+    }
+    
+    // 使用声音复刻专用配置
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    
+    // 修改payload以使用声音复刻配置
+    const voiceClonePayload = {
+      ...payload,
+      app_id: state.voiceCloneAppId,
+      access_token: state.voiceCloneAccessToken
+    };
+    
+    const response = await fetch(`${API_BASE}/api/tts`, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(voiceClonePayload)
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || `HTTP ${response.status}`);
+    }
+    
+    if (data.error) {
+      throw new Error(data.error);
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('声音复刻TTS失败:', error);
+    throw error;
+  }
+}
+
 // 声音试听功能
 async function testVoicePreview(speakerId, voiceName) {
   const testText = "亲爱的宝贝，妈妈在这里陪着你，感受这温暖的声音。";
@@ -1617,7 +1721,8 @@ async function testVoicePreview(speakerId, voiceName) {
       quality: 'draft'
     };
     
-    const data = await ttsSynthesize(payload);
+    // 使用声音复刻专用TTS函数
+    const data = await voiceCloneTTSSynthesize(payload);
     
     // 处理音频数据
     let audioBase64;

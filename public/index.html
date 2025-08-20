@@ -37,33 +37,65 @@
                 </div>
                 <div class="modal-body">
                     <div class="config-form">
-                        <div class="form-group">
-                            <label for="textApiKey">文本大模型API Key:</label>
-                            <input type="password" id="textApiKey" placeholder="请输入火山引擎文本模型API Key">
-                        </div>
-                        <div class="form-group">
-                            <label for="modelEndpoint">模型 Endpoint ID:</label>
-                            <input type="text" id="modelEndpoint" placeholder="请输入模型Endpoint ID，如：ep-20241201-xxxxx">
-                            <small class="form-hint">创建自定义推理接入点后获得的Endpoint ID，也可使用模型名称如：doubao-1.5-pro-32k-250115</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="appId">TTS AppID:</label>
-                            <input type="text" id="appId" placeholder="请输入火山引擎TTS应用ID">
-                            <small class="form-hint">在火山引擎控制台创建TTS应用后获得</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="accessToken">TTS Access Token:</label>
-                            <input type="password" id="accessToken" placeholder="请输入TTS Access Token">
-                            <small class="form-hint">在火山引擎TTS控制台获取的访问令牌</small>
+                        <!-- 文字内容生成配置 -->
+                        <div class="config-section">
+                            <h3 class="section-title">📝 文字内容生成</h3>
+                            <div class="form-group">
+                                <label for="textApiKey">文本大模型API Key:</label>
+                                <input type="password" id="textApiKey" placeholder="请输入火山引擎文本模型API Key">
+                            </div>
+                            <div class="form-group">
+                                <label for="modelEndpoint">模型 Endpoint ID:</label>
+                                <input type="text" id="modelEndpoint" placeholder="请输入模型Endpoint ID，如：ep-20241201-xxxxx">
+                                <small class="form-hint">创建自定义推理接入点后获得的Endpoint ID，也可使用模型名称如：doubao-1.5-pro-32k-250115</small>
+                            </div>
                         </div>
 
-                        
-                        <div class="form-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="testMode">
-                                <span class="checkmark"></span>
-                                测试模式（使用模拟数据，节省API成本）
-                            </label>
+                        <!-- 语音合成生成配置 -->
+                        <div class="config-section">
+                            <h3 class="section-title">🎵 语音合成生成</h3>
+                            <div class="form-group">
+                                <label for="appId">TTS AppID:</label>
+                                <input type="text" id="appId" placeholder="请输入火山引擎TTS应用ID">
+                                <small class="form-hint">在火山引擎控制台创建TTS应用后获得</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="accessToken">TTS Access Token:</label>
+                                <input type="password" id="accessToken" placeholder="请输入TTS Access Token">
+                                <small class="form-hint">在火山引擎TTS控制台获取的访问令牌</small>
+                            </div>
+                        </div>
+
+                        <!-- 声音复刻配置 -->
+                        <div class="config-section">
+                            <h3 class="section-title">🎤 声音复刻</h3>
+                            <div class="form-group">
+                                <label for="voiceCloneAppId">声音复刻 AppID:</label>
+                                <input type="text" id="voiceCloneAppId" placeholder="请输入声音复刻专用AppID">
+                                <small class="form-hint">声音复刻功能的专用应用ID</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="voiceCloneAccessToken">声音复刻 Access Token:</label>
+                                <input type="password" id="voiceCloneAccessToken" placeholder="请输入声音复刻Access Token">
+                                <small class="form-hint">声音复刻功能的专用访问令牌</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="voiceCloneSecretKey">声音复刻 Secret Key:</label>
+                                <input type="password" id="voiceCloneSecretKey" placeholder="请输入声音复刻Secret Key">
+                                <small class="form-hint">声音复刻功能的密钥</small>
+                            </div>
+                        </div>
+
+                        <!-- 通用设置 -->
+                        <div class="config-section">
+                            <h3 class="section-title">⚙️ 通用设置</h3>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="testMode">
+                                    <span class="checkmark"></span>
+                                    测试模式（使用模拟数据，节省API成本）
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>
