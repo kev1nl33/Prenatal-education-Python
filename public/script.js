@@ -382,7 +382,6 @@ const state = {
   accessToken: storage.get('ve_access_token', ''),
   voiceCloneAppId: storage.get('ve_voice_clone_appid', ''),
   voiceCloneAccessToken: storage.get('ve_voice_clone_access_token', ''),
-  voiceCloneSecretKey: storage.get('ve_voice_clone_secret_key', ''),
   voiceType: storage.get('ve_voice_type', 'zh_female_roumeinvyou_emo_v2_mars_bigtts'),
   testMode: storage.get('ve_test_mode', false),
   lastContent: '',
@@ -400,7 +399,6 @@ const el = {
   accessToken: document.getElementById('accessToken'),
   voiceCloneAppId: document.getElementById('voiceCloneAppId'),
   voiceCloneAccessToken: document.getElementById('voiceCloneAccessToken'),
-  voiceCloneSecretKey: document.getElementById('voiceCloneSecretKey'),
   testMode: document.getElementById('testMode'),
   saveConfig: document.getElementById('saveConfig'),
   contentType: document.getElementById('contentType'),
@@ -461,7 +459,6 @@ function init() {
   el.accessToken.value = state.accessToken;
   el.voiceCloneAppId.value = state.voiceCloneAppId;
   el.voiceCloneAccessToken.value = state.voiceCloneAccessToken;
-  el.voiceCloneSecretKey.value = state.voiceCloneSecretKey;
   el.testMode.checked = state.testMode;
 
   // 初始化内容卡片选择
@@ -778,7 +775,6 @@ el.saveConfig.addEventListener('click', () => {
   state.accessToken = el.accessToken.value.trim();
   state.voiceCloneAppId = el.voiceCloneAppId.value.trim();
   state.voiceCloneAccessToken = el.voiceCloneAccessToken.value.trim();
-  state.voiceCloneSecretKey = el.voiceCloneSecretKey.value.trim();
   // 语音类型现在从voiceSelector获取
   state.voiceType = el.voiceSelector.value;
   state.testMode = el.testMode.checked;
@@ -796,7 +792,6 @@ el.saveConfig.addEventListener('click', () => {
   storage.set('ve_access_token', state.accessToken);
   storage.set('ve_voice_clone_appid', state.voiceCloneAppId);
   storage.set('ve_voice_clone_access_token', state.voiceCloneAccessToken);
-  storage.set('ve_voice_clone_secret_key', state.voiceCloneSecretKey);
   storage.set('ve_voice_type', state.voiceType);
   storage.set('ve_test_mode', state.testMode);
 

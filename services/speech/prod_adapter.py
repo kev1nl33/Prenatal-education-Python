@@ -382,7 +382,7 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
             "app": {
                 "appid": self.app_id,
                 "token": self.access_token,
-                "cluster": "volcano_tts"
+                "cluster": "volcano_icl"
             },
             "user": {
                 "uid": "prenatal_education_user"
@@ -440,7 +440,7 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                 "app": {
                     "appid": self.app_id,
                     "token": self.access_token,
-                    "cluster": "volcano_tts"
+                    "cluster": "volcano_icl"
                 },
                 "user": {
                     "uid": "test_user"
@@ -541,7 +541,7 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                 "app": {
                     "appid": self.app_id,
                     "token": self.access_token,
-                    "cluster": "volcano_tts"
+                    "cluster": "volcano_icl"
                 },
                 "user": {
                     "uid": "test_user"
