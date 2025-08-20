@@ -745,10 +745,21 @@ function initVoiceSelector() {
   // 添加change事件监听器
   el.voiceSelector.addEventListener('change', (e) => {
     const selectedVoice = e.target.value;
+    const voiceName = e.target.options[e.target.selectedIndex].textContent;
+    
+    console.log('语音选择器变更:', {
+      selectedVoice,
+      voiceName,
+      isClonedVoice: selectedVoice && !selectedVoice.startsWith('zh_')
+    });
+    
     state.voiceType = selectedVoice;
 
     // 保存到localStorage
     storage.set('ve_voice_type', selectedVoice);
+    
+    // 显示当前选择的语音
+    showSuccess(`已选择语音：${voiceName}`);
   });
 }
 
@@ -1085,8 +1096,13 @@ async function previewContent() {
       quality: 'draft'
     };
     
-    // 使用声音复刻专用TTS函数
-    const data = await voiceCloneTTSSynthesize(payload);
+    console.log('试听语音参数:', payload);
+    console.log('是否为复刻声音:', isClonedVoice);
+    
+    // 根据语音类型选择合适的TTS函数
+    const data = isClonedVoice ? 
+      await voiceCloneTTSSynthesize(payload) : 
+      await ttsSynthesize(payload);
     
     let audioBase64;
     let blob;
@@ -1170,8 +1186,10 @@ el.generateAudio.addEventListener('click', async() => {
   }
   setLoading(el.generateAudio, true);
   try {
-    // 如果使用复刻声音，先进行连接测试
+    // 判断是否为复刻声音
     const isClonedVoice = state.voiceType && !state.voiceType.startsWith('zh_');
+    
+    // 如果使用复刻声音，先进行连接测试
     if (isClonedVoice && !state.testMode) {
       showSuccess('正在测试声音连接...');
       const testResult = await testVoiceConnection(state.voiceType);
@@ -1188,8 +1206,13 @@ el.generateAudio.addEventListener('click', async() => {
       quality: 'draft'
     };
     
-    // 使用声音复刻专用TTS函数
-    const data = await voiceCloneTTSSynthesize(payload);
+    console.log('生成语音参数:', payload);
+    console.log('是否为复刻声音:', isClonedVoice);
+    
+    // 根据语音类型选择合适的TTS函数
+    const data = isClonedVoice ? 
+      await voiceCloneTTSSynthesize(payload) : 
+      await ttsSynthesize(payload);
 
     let audioBase64;
     let blob;
@@ -1872,11 +1895,40 @@ function useClonedVoice(speakerId, voiceName) {
 // 声音复刻专用TTS函数
 async function voiceCloneTTSSynthesize(payload) {
   try {
-    // 检查是否配置了声音复刻API
-    if (!state.voiceCloneAppId || !state.voiceCloneAccessToken) {
-      // 如果没有配置声音复刻API，使用普通TTS API
+    // 检查是否为复刻声音
+    const isClonedVoice = payload.voice_type && !payload.voice_type.startsWith('zh_');
+    
+    if (!isClonedVoice) {
+      // 如果不是复刻声音，使用普通TTS API
+      console.log('使用普通TTS API处理非复刻声音:', payload.voice_type);
       return await ttsSynthesize(payload);
     }
+    
+    // 检查是否配置了声音复刻API
+    if (!state.voiceCloneAppId || !state.voiceCloneAccessToken) {
+      const errorMsg = '声音复刻功能未配置';
+      const suggestion = '请点击页面右上角的设置按钮，配置火山引擎的AppID和Access Token';
+      showError(errorMsg, { 
+        showRetry: false,
+        suggestion: suggestion
+      });
+      throw new Error(`${errorMsg}。${suggestion}`);
+    }
+    
+    // 验证配置格式
+    if (state.voiceCloneAppId.length < 10) {
+      throw new Error('AppID格式不正确，请检查配置');
+    }
+    
+    if (state.voiceCloneAccessToken.length < 20) {
+      throw new Error('Access Token格式不正确，请检查配置');
+    }
+    
+    console.log('使用声音复刻API:', {
+      voice_type: payload.voice_type,
+      app_id: state.voiceCloneAppId ? '已配置' : '未配置',
+      access_token: state.voiceCloneAccessToken ? '已配置' : '未配置'
+    });
     
     // 使用声音复刻专用配置
     const headers = {
@@ -1907,17 +1959,30 @@ async function voiceCloneTTSSynthesize(payload) {
     const data = await response.json();
     
     if (!response.ok) {
-      throw new Error(data.error || `HTTP ${response.status}`);
+      const errorMsg = data.error || `HTTP ${response.status}`;
+      console.error('声音复刻API响应错误:', errorMsg);
+      throw new Error(`声音复刻失败: ${errorMsg}`);
     }
     
     if (data.error) {
-      throw new Error(data.error);
+      console.error('声音复刻返回错误:', data.error);
+      throw new Error(`声音复刻失败: ${data.error}`);
     }
     
+    console.log('声音复刻TTS成功');
     return data;
   } catch (error) {
     console.error('声音复刻TTS失败:', error);
-    throw error;
+    // 提供更友好的错误信息
+    if (error.message.includes('timeout')) {
+      throw new Error('声音复刻请求超时，请稍后重试');
+    } else if (error.message.includes('network')) {
+      throw new Error('网络连接失败，请检查网络设置');
+    } else if (error.message.includes('未配置')) {
+      throw error; // 保持配置错误的原始信息
+    } else {
+      throw new Error(`声音复刻失败: ${error.message}`);
+    }
   }
 }
 
@@ -1935,8 +2000,15 @@ async function testVoicePreview(speakerId, voiceName) {
       quality: 'draft'
     };
     
-    // 使用声音复刻专用TTS函数
-    const data = await voiceCloneTTSSynthesize(payload);
+    // 判断是否为复刻声音
+    const isClonedVoice = speakerId && !speakerId.startsWith('zh_');
+    console.log('试听声音参数:', payload);
+    console.log('是否为复刻声音:', isClonedVoice);
+    
+    // 根据语音类型选择合适的TTS函数
+    const data = isClonedVoice ? 
+      await voiceCloneTTSSynthesize(payload) : 
+      await ttsSynthesize(payload);
     
     // 处理音频数据
     let audioBase64;
@@ -1984,7 +2056,15 @@ async function testVoiceConnection(speakerId) {
       quality: 'draft'
     };
     
-    const data = await ttsSynthesize(payload);
+    // 判断是否为复刻声音
+    const isClonedVoice = speakerId && !speakerId.startsWith('zh_');
+    console.log('测试连接参数:', payload);
+    console.log('是否为复刻声音:', isClonedVoice);
+    
+    // 根据语音类型选择合适的TTS函数
+    const data = isClonedVoice ? 
+      await voiceCloneTTSSynthesize(payload) : 
+      await ttsSynthesize(payload);
     
     // 验证返回数据
     if (data.data || data.audio) {
