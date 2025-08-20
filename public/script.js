@@ -844,14 +844,6 @@ el.generateAudio.addEventListener('click', async() => {
     
     el.audioElement.src = url;
     el.audioPlayer.style.display = 'flex';
-
-    // 将历史记录的文本设置为当前内容
-    state.lastContent = text;
-    el.contentText.textContent = text;
-    checkTextLength(text); // 检查文本长度并显示/隐藏展开按钮
-    el.resultSection.style.display = 'block';
-
-    showSuccess('历史记录语音生成成功！');
   } catch (e) {
     console.error(e);
     alert('生成语音失败：' + (e.message || '请稍后重试'));
