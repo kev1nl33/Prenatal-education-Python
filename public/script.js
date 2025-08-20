@@ -49,48 +49,217 @@ function showSuccess(message) {
   }, 3000);
 }
 
-// 显示错误提示
-function showError(message) {
+// 错误类型枚举
+const ErrorTypes = {
+  NETWORK: 'network',
+  TIMEOUT: 'timeout',
+  AUTH: 'auth',
+  CONFIG: 'config',
+  API: 'api',
+  VALIDATION: 'validation',
+  UNKNOWN: 'unknown'
+};
+
+// 分析错误类型
+function analyzeError(error) {
+  const message = error.message || error.toString();
+  
+  if (message.includes('超时') || message.includes('timeout') || message.includes('504')) {
+    return {
+      type: ErrorTypes.TIMEOUT,
+      userMessage: '请求超时，请稍后重试或尝试缩短文本长度',
+      suggestion: '建议：1. 检查网络连接 2. 缩短输入文本 3. 稍后重试'
+    };
+  }
+  
+  if (message.includes('401') || message.includes('认证') || message.includes('token')) {
+    return {
+      type: ErrorTypes.AUTH,
+      userMessage: '认证失败，请检查API配置',
+      suggestion: '建议：1. 检查AppID和Access Token是否正确 2. 确认账户余额充足'
+    };
+  }
+  
+  if (message.includes('403') || message.includes('权限')) {
+    return {
+      type: ErrorTypes.AUTH,
+      userMessage: '权限不足，请检查API权限配置',
+      suggestion: '建议：1. 确认API密钥有相应权限 2. 检查服务是否已开通'
+    };
+  }
+  
+  if (message.includes('网络') || message.includes('连接') || message.includes('fetch')) {
+    return {
+      type: ErrorTypes.NETWORK,
+      userMessage: '网络连接失败，请检查网络状态',
+      suggestion: '建议：1. 检查网络连接 2. 确认服务器状态正常 3. 稍后重试'
+    };
+  }
+  
+  if (message.includes('配置') || message.includes('参数')) {
+    return {
+      type: ErrorTypes.CONFIG,
+      userMessage: '配置错误，请检查相关设置',
+      suggestion: '建议：1. 检查API配置是否完整 2. 确认参数格式正确'
+    };
+  }
+  
+  if (message.includes('API') || message.includes('服务')) {
+    return {
+      type: ErrorTypes.API,
+      userMessage: 'API服务异常，请稍后重试',
+      suggestion: '建议：1. 稍后重试 2. 检查服务状态 3. 联系技术支持'
+    };
+  }
+  
+  return {
+    type: ErrorTypes.UNKNOWN,
+    userMessage: message.length > 100 ? message.substring(0, 100) + '...' : message,
+    suggestion: '建议：1. 刷新页面重试 2. 检查网络连接 3. 联系技术支持'
+  };
+}
+
+// 显示错误提示（增强版）
+function showError(error, options = {}) {
+  const errorInfo = typeof error === 'string' ? 
+    { type: ErrorTypes.UNKNOWN, userMessage: error, suggestion: '' } : 
+    analyzeError(error);
+  
   // 创建错误提示元素
   const errorDiv = document.createElement('div');
-  errorDiv.className = 'error-message';
-  errorDiv.textContent = message;
+  errorDiv.className = 'error-message enhanced';
+  
+  // 根据错误类型选择图标和颜色
+  const errorConfig = {
+    [ErrorTypes.TIMEOUT]: { icon: '⏱️', color: '#ff6b6b' },
+    [ErrorTypes.AUTH]: { icon: '🔐', color: '#ff4757' },
+    [ErrorTypes.NETWORK]: { icon: '🌐', color: '#ff6348' },
+    [ErrorTypes.CONFIG]: { icon: '⚙️', color: '#ff7675' },
+    [ErrorTypes.API]: { icon: '🔧', color: '#fd79a8' },
+    [ErrorTypes.VALIDATION]: { icon: '⚠️', color: '#fdcb6e' },
+    [ErrorTypes.UNKNOWN]: { icon: '❌', color: '#ff4757' }
+  };
+  
+  const config = errorConfig[errorInfo.type] || errorConfig[ErrorTypes.UNKNOWN];
+  
+  errorDiv.innerHTML = `
+    <div class="error-header">
+      <span class="error-icon">${config.icon}</span>
+      <span class="error-title">操作失败</span>
+      <button class="error-close" onclick="this.parentElement.parentElement.remove()">×</button>
+    </div>
+    <div class="error-content">
+      <div class="error-message-text">${errorInfo.userMessage}</div>
+      ${errorInfo.suggestion ? `<div class="error-suggestion">${errorInfo.suggestion}</div>` : ''}
+    </div>
+    ${options.showRetry ? '<button class="error-retry-btn" onclick="' + (options.retryAction || '') + '">重试</button>' : ''}
+  `;
+  
   errorDiv.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #ff4757;
-        color: white;
-        padding: 12px 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(255, 71, 87, 0.3);
-        z-index: 10000;
-        max-width: 300px;
-        word-wrap: break-word;
-        animation: slideIn 0.3s ease-out;
-    `;
-
-  // 添加动画样式
-  if (!document.querySelector('#error-animation-style')) {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: white;
+    border-left: 4px solid ${config.color};
+    padding: 0;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    z-index: 10000;
+    max-width: 350px;
+    min-width: 280px;
+    animation: slideIn 0.3s ease-out;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  `;
+  
+  // 添加样式
+  if (!document.querySelector('#enhanced-error-style')) {
     const style = document.createElement('style');
-    style.id = 'error-animation-style';
+    style.id = 'enhanced-error-style';
     style.textContent = `
-            @keyframes slideIn {
-                from { transform: translateX(100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-        `;
+      @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+      .error-message.enhanced .error-header {
+        display: flex;
+        align-items: center;
+        padding: 12px 16px;
+        background: #f8f9fa;
+        border-radius: 8px 8px 0 0;
+        border-bottom: 1px solid #e9ecef;
+      }
+      .error-message.enhanced .error-icon {
+        margin-right: 8px;
+        font-size: 16px;
+      }
+      .error-message.enhanced .error-title {
+        flex: 1;
+        font-weight: 600;
+        color: #495057;
+        font-size: 14px;
+      }
+      .error-message.enhanced .error-close {
+        background: none;
+        border: none;
+        font-size: 18px;
+        color: #6c757d;
+        cursor: pointer;
+        padding: 0;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .error-message.enhanced .error-close:hover {
+        color: #495057;
+      }
+      .error-message.enhanced .error-content {
+        padding: 16px;
+      }
+      .error-message.enhanced .error-message-text {
+        color: #495057;
+        font-size: 14px;
+        line-height: 1.4;
+        margin-bottom: 8px;
+      }
+      .error-message.enhanced .error-suggestion {
+        color: #6c757d;
+        font-size: 12px;
+        line-height: 1.3;
+        background: #f8f9fa;
+        padding: 8px;
+        border-radius: 4px;
+        margin-top: 8px;
+      }
+      .error-message.enhanced .error-retry-btn {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+        margin-top: 8px;
+      }
+      .error-message.enhanced .error-retry-btn:hover {
+        background: #0056b3;
+      }
+    `;
     document.head.appendChild(style);
   }
 
   document.body.appendChild(errorDiv);
 
-  // 3秒后自动移除
-  setTimeout(() => {
-    if (errorDiv.parentNode) {
-      errorDiv.parentNode.removeChild(errorDiv);
-    }
-  }, 3000);
+  // 自动移除（可配置时间）
+  const autoRemoveTime = options.autoRemove !== false ? (options.duration || 5000) : 0;
+  if (autoRemoveTime > 0) {
+    setTimeout(() => {
+      if (errorDiv.parentNode) {
+        errorDiv.parentNode.removeChild(errorDiv);
+      }
+    }, autoRemoveTime);
+  }
 }
 
 // 生成模拟响应（测试模式）
@@ -331,6 +500,44 @@ async function arkGenerate(prompt, model) {
 }
 
 // TTS语音合成API封装
+// 带超时和重试的fetch函数
+async function fetchWithTimeoutAndRetry(url, options, timeout = 60000, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+      
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.warn(`请求超时 (尝试 ${attempt}/${maxRetries})`);
+        if (attempt === maxRetries) {
+          throw new Error(`请求超时：服务器响应时间超过${timeout/1000}秒，请稍后重试`);
+        }
+      } else if (error.message.includes('504') || error.message.includes('Gateway Timeout')) {
+        console.warn(`服务器超时 (尝试 ${attempt}/${maxRetries})`);
+        if (attempt === maxRetries) {
+          throw new Error('服务器处理超时，请尝试缩短文本长度或稍后重试');
+        }
+      } else {
+        throw error;
+      }
+      
+      // 重试前等待
+      if (attempt < maxRetries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // 指数退避，最大5秒
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+}
+
 async function ttsSynthesize(payload) {
   try {
     // 检查是否为测试模式
@@ -343,11 +550,19 @@ async function ttsSynthesize(payload) {
       'Content-Type': 'application/json'
     };
 
-    const response = await fetch(`${API_BASE}/api/tts`, {
+    // 根据文本长度调整超时时间
+    const textLength = payload.text ? payload.text.length : 0;
+    const baseTimeout = 30000; // 基础30秒
+    const timeoutPerChar = 50; // 每个字符增加50ms
+    const timeout = Math.min(baseTimeout + (textLength * timeoutPerChar), 120000); // 最大2分钟
+    
+    console.log(`文本长度: ${textLength}, 超时设置: ${timeout/1000}秒`);
+
+    const response = await fetchWithTimeoutAndRetry(`${API_BASE}/api/tts`, {
       method: 'POST',
       headers: headers,
       body: JSON.stringify(payload)
-    });
+    }, timeout);
 
     const data = await response.json();
 
@@ -369,6 +584,7 @@ async function ttsSynthesize(payload) {
 
     return data;
   } catch (error) {
+    console.error('TTS API调用失败:', error);
     showError(`语音合成失败: ${error.message}`);
     throw error;
   }
@@ -612,16 +828,21 @@ function renderHistoryInModal() {
   }
 
   historyList.innerHTML = state.history.map((item, index) => {
-    const type = item.contentType || item.type || 'unknown';
-    const timestamp = item.timestamp || item.time || Date.now();
-    const text = (item.content !== null ? item.content : item.text) || '';
+    // 统一使用与renderHistory相同的字段
+    const type = item.type || 'unknown';
+    const mood = item.mood || 'neutral';
+    const duration = item.duration || 'short';
+    const timestamp = item.time || Date.now();
+    const text = item.text || '';
     const preview = text.substring(0, 100);
     return `
     <div class="history-item" data-index="${index}">
       <div class="history-content">
         <div class="history-meta">
-          <span class="history-type">${getContentTypeLabel(type)}</span>
-          <span class="history-date">${new Date(timestamp).toLocaleString()}</span>
+          <span class="badge">${escapeHtml(type)}</span>
+          <span class="badge">${escapeHtml(mood)}</span>
+          <span class="badge">${escapeHtml(duration)}</span>
+          <span class="time">${new Date(timestamp).toLocaleString()}</span>
         </div>
         <div class="history-text">${escapeHtml(preview)}${text.length > 100 ? '...' : ''}</div>
       </div>
@@ -634,18 +855,7 @@ function renderHistoryInModal() {
   }).join('');
 }
 
-// 获取内容类型标签
-function getContentTypeLabel(type) {
-  const labels = {
-    'story': '温馨故事',
-    'poetry': '诗歌朗诵',
-    'wisdom': '育儿智慧',
-    'nature': '自然描述',
-    'emotion': '情感表达',
-    'learning': '启蒙认知'
-  };
-  return labels[type] || type;
-}
+// getContentTypeLabel函数已删除，因为现在直接使用原始type值
 
 // 加载历史记录项
 function loadHistoryItem(index) {
@@ -655,7 +865,8 @@ function loadHistoryItem(index) {
       showError('未找到该条历史记录');
       return;
     }
-    const text = (item.content !== null ? item.content : item.text) || '';
+    // 统一使用text字段
+    const text = item.text || '';
 
     state.lastContent = text;
     el.contentText.textContent = text;
@@ -1679,11 +1890,19 @@ async function voiceCloneTTSSynthesize(payload) {
       access_token: state.voiceCloneAccessToken
     };
     
-    const response = await fetch(`${API_BASE}/api/tts`, {
+    // 根据文本长度调整超时时间
+    const textLength = payload.text ? payload.text.length : 0;
+    const baseTimeout = 30000; // 基础30秒
+    const timeoutPerChar = 50; // 每个字符增加50ms
+    const timeout = Math.min(baseTimeout + (textLength * timeoutPerChar), 120000); // 最大2分钟
+    
+    console.log(`声音复刻TTS - 文本长度: ${textLength}, 超时设置: ${timeout/1000}秒`);
+    
+    const response = await fetchWithTimeoutAndRetry(`${API_BASE}/api/tts`, {
       method: 'POST',
       headers: headers,
       body: JSON.stringify(voiceClonePayload)
-    });
+    }, timeout);
     
     const data = await response.json();
     

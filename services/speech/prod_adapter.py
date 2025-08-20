@@ -75,6 +75,14 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
         
         return config
     
+    def _get_cluster_for_voice(self, voice_type: str) -> str:
+        """根据声音类型获取正确的cluster配置"""
+        # 如果是复刻声音（非预设声音），使用volcano_icl
+        if voice_type and not voice_type.startswith('zh_'):
+            return "volcano_icl"
+        # 普通TTS使用volcano_tts
+        return "volcano_tts"
+    
     def _make_request_with_retry(self, payload: Dict[str, Any]) -> bytes:
         """带重试的请求"""
         last_exception = None
@@ -377,12 +385,15 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
         # 获取音色配置
         voice_config = self._get_voice_config(voice_type, quality)
         
+        # 根据声音类型选择正确的cluster
+        cluster = self._get_cluster_for_voice(voice_type)
+        
         # 构建请求负载 - 按照官方文档格式
         payload = {
             "app": {
                 "appid": self.app_id,
                 "token": self.access_token,
-                "cluster": "volcano_icl"
+                "cluster": cluster  # 动态选择cluster
             },
             "user": {
                 "uid": "prenatal_education_user"
@@ -435,12 +446,12 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                    language: str = "zh", model_type: int = 1, **kwargs) -> Dict[str, Any]:
         """声音复刻"""
         try:
-            # 构建请求payload
+            # 构建请求payload - 根据火山引擎官方文档
             payload = {
                 "app": {
                     "appid": self.app_id,
                     "token": self.access_token,
-                    "cluster": "volcano_icl"
+                    "cluster": "volcano_icl"  # 声音复刻2.0使用volcano_icl
                 },
                 "user": {
                     "uid": "test_user"
@@ -459,7 +470,7 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                     "audios": [base64.b64encode(audio_data).decode('utf-8')],
                     "source": "api",
                     "language": language,
-                    "model_type": model_type,
+                    "model_type": model_type,  # 1=ICL, 2=DiT标准版, 3=DiT还原版
                     "extra_params": kwargs.get("extra_params", {})
                 }
             }
@@ -474,7 +485,7 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                 headers={
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer;{self.access_token}",
-                    "Resource-Id": self.app_id  # 声音复刻2.0需要Resource-Id头
+                    "Resource-Id": "volc.megatts.voiceclone"  # 声音复刻专用Resource-Id
                 }
             )
             
@@ -570,7 +581,7 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                 headers={
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer;{self.access_token}",
-                    "Resource-Id": self.app_id  # 声音复刻2.0需要Resource-Id头
+                    "Resource-Id": "volc.megatts.voiceclone"  # 声音复刻专用Resource-Id
                 }
             )
             
