@@ -316,6 +316,57 @@ input:focus, select:focus, textarea:focus { border-color: #93C5FD; box-shadow: 0
   box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.1);
 }
 
+/* 音频生成控制区域 */
+.audio-generation-controls {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.audio-generation-controls .btn {
+    flex: 1;
+}
+
+/* 试听播放器样式 */
+.preview-player {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: rgba(138, 92, 246, 0.1);
+    border: 1px solid rgba(138, 92, 246, 0.3);
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+}
+
+.preview-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.preview-label {
+    font-weight: 600;
+    color: #8b5cf6;
+    font-size: 0.9rem;
+}
+
+.preview-text {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-style: italic;
+}
+
+.preview-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.preview-actions .btn {
+    flex: 1;
+}
+
+/* 音频播放器样式 */
 .audio-player { 
   display: flex; 
   align-items: center; 
@@ -677,6 +728,22 @@ input:focus, select:focus, textarea:focus { border-color: #93C5FD; box-shadow: 0
 .btn-delete:hover {
   background: rgba(220, 53, 69, 0.2);
   transform: translateY(-1px);
+}
+
+.btn-preview {
+  background: linear-gradient(135deg, #6f42c1, #8b5cf6);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-preview:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(111, 66, 193, 0.3);
 }
 
 /* 响应式设计 */

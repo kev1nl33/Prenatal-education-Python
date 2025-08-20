@@ -369,6 +369,7 @@ const state = {
   lastContent: '',
   lastAudioBlob: null,
   lastAudioUrl: null, // 添加URL跟踪
+  lastPreviewUrl: null, // 试听音频URL跟踪
   history: storage.get('ve_history', [])
 };
 
@@ -392,6 +393,12 @@ const el = {
   audioPlayer: document.getElementById('audioPlayer'),
   audioElement: document.getElementById('audioElement'),
   downloadAudio: document.getElementById('downloadAudio'),
+  previewAudio: document.getElementById('previewAudio'),
+  previewPlayer: document.getElementById('previewPlayer'),
+  previewAudioElement: document.getElementById('previewAudioElement'),
+  previewText: document.getElementById('previewText'),
+  confirmPreview: document.getElementById('confirmPreview'),
+  retryPreview: document.getElementById('retryPreview'),
   historyList: document.getElementById('historyList'),
   // 设置模态框相关元素
   settingsBtn: document.getElementById('settingsBtn'),
@@ -641,6 +648,10 @@ function deleteHistoryItem(index) {
 // 暴露到全局，供内联 onclick 调用
 window.loadHistoryItem = loadHistoryItem;
 window.deleteHistoryItem = deleteHistoryItem;
+window.testVoicePreview = testVoicePreview;
+window.previewContent = previewContent;
+window.useClonedVoice = useClonedVoice;
+window.deleteClonedVoice = deleteClonedVoice;
 
 // 初始化文本展开功能
 function initTextExpansion() {
@@ -756,6 +767,14 @@ el.generateContent.addEventListener('click', async() => {
     checkTextLength(text); // 检查文本长度并显示/隐藏展开按钮
     el.resultSection.style.display = 'block';
     el.audioPlayer.style.display = 'none';
+    
+    // 重置试听状态
+    el.previewPlayer.style.display = 'none';
+    el.generateAudio.disabled = true;
+    if (state.lastPreviewUrl) {
+      URL.revokeObjectURL(state.lastPreviewUrl);
+      state.lastPreviewUrl = null;
+    }
     addHistory({
       type: el.contentType.value,
       mood: el.mood.value,
@@ -771,6 +790,114 @@ el.generateContent.addEventListener('click', async() => {
   }
 });
 
+// 试听功能
+async function previewContent() {
+  if (!state.lastContent) {
+    showError('请先生成文本内容');
+    return;
+  }
+  
+  setLoading(el.previewAudio, true);
+  try {
+    // 截取前30个字符作为试听内容
+    const previewText = state.lastContent.substring(0, 30);
+    if (previewText.length < 10) {
+      throw new Error('生成的内容太短，无法进行试听');
+    }
+    
+    // 如果使用复刻声音，先进行连接测试
+    const isClonedVoice = state.voiceType && !state.voiceType.startsWith('zh_');
+    if (isClonedVoice && !state.testMode) {
+      showSuccess('正在测试声音连接...');
+      const testResult = await testVoiceConnection(state.voiceType);
+      if (!testResult.success) {
+        throw new Error(testResult.message);
+      }
+    }
+    
+    const payload = {
+      text: previewText,
+      voice_type: state.voiceType || 'zh_female_roumeinvyou_emo_v2_mars_bigtts',
+      emotion: el.mood.value === 'happy' ? 'happy' : 'neutral',
+      quality: 'draft'
+    };
+    
+    const data = await ttsSynthesize(payload);
+    
+    let audioBase64;
+    let blob;
+    
+    // 处理测试模式和生产模式的不同返回格式
+    if (state.testMode || (data.mode && data.mode === 'test')) {
+      if (data.data && typeof data.data === 'string') {
+        audioBase64 = data.data;
+      } else {
+        throw new Error('测试模式返回格式异常：未找到音频数据');
+      }
+      
+      const audioBytes = base64ToBytes(audioBase64);
+      const mimeType = data.encoding === 'wav' ? 'audio/wav' : 'audio/mpeg';
+      blob = new Blob([audioBytes], { type: mimeType });
+    } else {
+      if (data.data && typeof data.data === 'string') {
+        audioBase64 = data.data;
+      } else if (data.data && data.data.audio) {
+        audioBase64 = data.data.audio;
+      } else if (data.audio) {
+        audioBase64 = data.audio;
+      } else {
+        throw new Error('TTS返回格式异常：未找到音频数据');
+      }
+      
+      const audioBytes = base64ToBytes(audioBase64);
+      const mimeType = data.encoding ? (data.encoding === 'wav' ? 'audio/wav' : 'audio/mpeg') : detectAudioMimeType(audioBytes);
+      blob = new Blob([audioBytes], { type: mimeType });
+    }
+    
+    // 清理旧的试听音频URL
+    if (state.lastPreviewUrl) {
+      URL.revokeObjectURL(state.lastPreviewUrl);
+    }
+    
+    const url = URL.createObjectURL(blob);
+    state.lastPreviewUrl = url;
+    
+    // 显示试听内容
+    el.previewText.textContent = `"${previewText}${state.lastContent.length > 30 ? '...' : ''}"`;
+    el.previewAudioElement.src = url;
+    el.previewPlayer.style.display = 'block';
+    
+    // 添加错误处理
+    el.previewAudioElement.onerror = (e) => {
+      console.error('试听音频加载失败:', e);
+      showError('试听音频播放失败，请重试');
+    };
+    
+    showSuccess('试听音频生成成功！请确认效果后生成完整语音');
+    
+  } catch (e) {
+    console.error(e);
+    showError('试听失败：' + (e.message || '请稍后重试'));
+  } finally {
+    setLoading(el.previewAudio, false);
+  }
+}
+
+// 试听按钮事件
+el.previewAudio.addEventListener('click', previewContent);
+
+// 确认试听效果
+el.confirmPreview.addEventListener('click', () => {
+  el.generateAudio.disabled = false;
+  el.previewPlayer.style.display = 'none';
+  showSuccess('已确认试听效果，现在可以生成完整语音');
+});
+
+// 重新试听
+el.retryPreview.addEventListener('click', () => {
+  previewContent();
+});
+
 // 生成语音
 el.generateAudio.addEventListener('click', async() => {
   if (!state.lastContent) {
@@ -779,6 +906,17 @@ el.generateAudio.addEventListener('click', async() => {
   }
   setLoading(el.generateAudio, true);
   try {
+    // 如果使用复刻声音，先进行连接测试
+    const isClonedVoice = state.voiceType && !state.voiceType.startsWith('zh_');
+    if (isClonedVoice && !state.testMode) {
+      showSuccess('正在测试声音连接...');
+      const testResult = await testVoiceConnection(state.voiceType);
+      if (!testResult.success) {
+        throw new Error(testResult.message);
+      }
+      showSuccess('声音连接测试通过，开始生成完整语音...');
+    }
+    
     const payload = {
       text: state.lastContent,
       voice_type: state.voiceType || 'zh_female_roumeinvyou_emo_v2_mars_bigtts',
@@ -1425,6 +1563,7 @@ function renderVoicesList() {
           <span>${new Date(voice.created_at).toLocaleString()}</span>
         </div>
         <div class="voice-actions">
+          <button class="btn-preview" onclick="testVoicePreview('${voice.speaker_id}', '${escapeHtml(voice.name)}')">试听</button>
           <button class="btn-use" onclick="useClonedVoice('${voice.speaker_id}', '${escapeHtml(voice.name)}')">使用此声音</button>
           <button class="btn-delete" onclick="deleteClonedVoice('${voice.speaker_id}')">删除</button>
         </div>
@@ -1462,6 +1601,83 @@ function useClonedVoice(speakerId, voiceName) {
   storage.set('ve_voice_type', speakerId);
   
   showSuccess(`已切换到声音: ${voiceName}`);
+}
+
+// 声音试听功能
+async function testVoicePreview(speakerId, voiceName) {
+  const testText = "亲爱的宝贝，妈妈在这里陪着你，感受这温暖的声音。";
+  
+  try {
+    showSuccess(`正在试听声音: ${voiceName}...`);
+    
+    const payload = {
+      text: testText,
+      voice_type: speakerId,
+      emotion: 'neutral',
+      quality: 'draft'
+    };
+    
+    const data = await ttsSynthesize(payload);
+    
+    // 处理音频数据
+    let audioBase64;
+    if (data.data && typeof data.data === 'string') {
+      audioBase64 = data.data;
+    } else if (data.data && data.data.audio) {
+      audioBase64 = data.data.audio;
+    } else if (data.audio) {
+      audioBase64 = data.audio;
+    } else {
+      throw new Error('未找到音频数据');
+    }
+    
+    const audioBytes = base64ToBytes(audioBase64);
+    const mimeType = data.encoding ? (data.encoding === 'wav' ? 'audio/wav' : 'audio/mpeg') : detectAudioMimeType(audioBytes);
+    const blob = new Blob([audioBytes], { type: mimeType });
+    
+    // 创建临时音频播放器
+    const tempAudio = new Audio();
+    tempAudio.src = URL.createObjectURL(blob);
+    tempAudio.play();
+    
+    showSuccess(`声音 "${voiceName}" 试听成功！`);
+    
+    // 清理资源
+    tempAudio.addEventListener('ended', () => {
+      URL.revokeObjectURL(tempAudio.src);
+    });
+    
+  } catch (error) {
+    console.error('声音试听失败:', error);
+    showError(`声音试听失败: ${error.message}`);
+  }
+}
+
+// 测试声音连接功能
+async function testVoiceConnection(speakerId) {
+  const testText = "测试声音连接，这是一段简短的测试文本。";
+  
+  try {
+    const payload = {
+      text: testText,
+      voice_type: speakerId,
+      emotion: 'neutral',
+      quality: 'draft'
+    };
+    
+    const data = await ttsSynthesize(payload);
+    
+    // 验证返回数据
+    if (data.data || data.audio) {
+      return { success: true, message: '声音连接测试成功' };
+    } else {
+      return { success: false, message: '声音连接测试失败：未返回音频数据' };
+    }
+    
+  } catch (error) {
+    console.error('声音连接测试失败:', error);
+    return { success: false, message: `声音连接测试失败: ${error.message}` };
+  }
 }
 
 // 删除已复刻的声音
@@ -1569,8 +1785,17 @@ function stopStatusPolling() {
   }
 }
 
-// 页面卸载时停止轮询
-window.addEventListener('beforeunload', stopStatusPolling);
+// 页面卸载时停止轮询和清理资源
+window.addEventListener('beforeunload', () => {
+  stopStatusPolling();
+  // 清理音频URL资源
+  if (state.lastAudioUrl) {
+    URL.revokeObjectURL(state.lastAudioUrl);
+  }
+  if (state.lastPreviewUrl) {
+    URL.revokeObjectURL(state.lastPreviewUrl);
+  }
+});
 
 init();
 

@@ -177,10 +177,29 @@
                                 </select>
                             </div>
                         </div>
-                        <button id="generateAudio" class="btn btn-secondary">
-                            <span class="btn-text">生成语音</span>
-                            <div class="loading-spinner" style="display: none;"></div>
-                        </button>
+                        <div class="audio-generation-controls">
+                            <button id="previewAudio" class="btn btn-outline">
+                                <span class="btn-text">试听效果</span>
+                                <div class="loading-spinner" style="display: none;"></div>
+                            </button>
+                            <button id="generateAudio" class="btn btn-secondary" disabled>
+                                <span class="btn-text">生成语音</span>
+                                <div class="loading-spinner" style="display: none;"></div>
+                            </button>
+                        </div>
+                        <div class="preview-player" id="previewPlayer" style="display: none;">
+                            <div class="preview-header">
+                                <span class="preview-label">🎧 试听效果</span>
+                                <span class="preview-text" id="previewText"></span>
+                            </div>
+                            <audio controls id="previewAudioElement">
+                                您的浏览器不支持音频播放。
+                            </audio>
+                            <div class="preview-actions">
+                                <button id="confirmPreview" class="btn btn-primary btn-sm">效果满意，生成完整语音</button>
+                                <button id="retryPreview" class="btn btn-outline btn-sm">重新试听</button>
+                            </div>
+                        </div>
                         <div class="audio-player" id="audioPlayer" style="display: none;">
                             <audio controls id="audioElement">
                                 您的浏览器不支持音频播放。
