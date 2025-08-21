@@ -391,7 +391,7 @@ function getVoiceTypeName(voiceType) {
   const voiceNames = {
     'zh_female_roumeinvyou_emo_v2_mars_bigtts': '柔美女友（多情感）',
     'zh_female_shuangkuaisisi_emo_v2_mars_bigtts': '爽快思思（多情感）',
-    'zh_male_yangguangqingnian_emo_v2_mars_bigtts': '阳光青年（多情感）'
+    'ICL_zh_female_huoponvhai_tobzh_male_yangguangqingnian_emo_v2_mars_bigtts': '活泼女孩'
   };
   
   // 检查是否为复刻声音
@@ -417,9 +417,104 @@ function getFrequencyByVoiceType(voiceType) {
   const frequencies = {
     'zh_female_roumeinvyou_emo_v2_mars_bigtts': 440,  // 中音（柔美女友）
     'zh_female_shuangkuaisisi_emo_v2_mars_bigtts': 520, // 中高音（爽快思思）
-    'zh_male_yangguangqingnian_emo_v2_mars_bigtts': 330  // 中低音（阳光青年）
+    'ICL_zh_female_huoponvhai_tob': 330  // 活泼女孩
   };
   return frequencies[voiceType] || 440;
+}
+
+// 验证语音配置
+function validateVoiceConfiguration() {
+  const currentVoice = state.voiceType || 'zh_female_roumeinvyou_emo_v2_mars_bigtts';
+  const isClonedVoice = currentVoice && !currentVoice.startsWith('zh_');
+  
+  const validation = {
+    hasVoiceType: !!currentVoice,
+    hasEmotion: !!el.mood.value,
+    isValidVoiceType: currentVoice && currentVoice.length > 0,
+    isValidEmotion: ['happy', 'neutral'].includes(el.mood.value),
+    hasCloneConfig: isClonedVoice ? (!!state.voiceCloneAppId && !!state.voiceCloneAccessToken) : true,
+    hasTTSConfig: !isClonedVoice ? (!!state.ttsAppId && !!state.accessToken) : true
+  };
+  
+  const issues = [];
+  
+  if (!validation.hasVoiceType || !validation.isValidVoiceType) {
+    issues.push('语音类型无效');
+  }
+  
+  if (!validation.hasEmotion || !validation.isValidEmotion) {
+    issues.push('情绪设置无效');
+  }
+  
+  if (isClonedVoice && !validation.hasCloneConfig) {
+    issues.push('声音复刻配置缺失（需要AppID和AccessToken）');
+  }
+  
+  if (!isClonedVoice && !validation.hasTTSConfig) {
+    issues.push('TTS配置缺失（需要AppID和AccessToken）');
+  }
+  
+  console.log('🔍 配置验证结果:', {
+    validation,
+    issues,
+    isValid: issues.length === 0
+  });
+  
+  return {
+    isValid: issues.length === 0,
+    issues,
+    validation
+  };
+}
+
+// 更新语音状态显示
+function updateVoiceStatusDisplay() {
+  const currentVoice = state.voiceType || 'zh_female_roumeinvyou_emo_v2_mars_bigtts';
+  const currentEmotion = el.mood.value || 'neutral';
+  const voiceName = getVoiceTypeName(currentVoice);
+  const emotionName = currentEmotion === 'happy' ? '开心' : '中性';
+  const isCloned = currentVoice && !currentVoice.startsWith('zh_');
+  
+  // 查找或创建状态显示元素
+  let statusDisplay = document.getElementById('voiceStatusDisplay');
+  if (!statusDisplay) {
+    statusDisplay = document.createElement('div');
+    statusDisplay.id = 'voiceStatusDisplay';
+    statusDisplay.style.cssText = `
+      margin: 10px 0;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      font-size: 14px;
+      color: #fff;
+      border-left: 3px solid #4CAF50;
+    `;
+    
+    // 插入到语音设置区域
+    const voiceSettings = document.querySelector('.voice-settings');
+    if (voiceSettings) {
+      voiceSettings.appendChild(statusDisplay);
+    }
+  }
+  
+  statusDisplay.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="font-weight: bold;">当前设置:</span>
+      <span style="background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 4px;">
+        ${isCloned ? '🎤' : '🎵'} ${voiceName}
+      </span>
+      <span style="background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 4px;">
+        😊 ${emotionName}
+      </span>
+    </div>
+  `;
+  
+  console.log('🔄 状态显示已更新:', {
+    voice: voiceName,
+    emotion: emotionName,
+    isCloned,
+    timestamp: new Date().toISOString()
+  });
 }
 
 // 将Blob转换为Base64
@@ -622,6 +717,7 @@ const el = {
   voiceSelector: document.getElementById('voiceSelector'),
   mood: document.getElementById('mood'),
   duration: document.getElementById('duration'),
+  testVoiceSettings: document.getElementById('testVoiceSettings'),
   generateContent: document.getElementById('generateContent'),
   resultSection: document.getElementById('resultSection'),
   contentText: document.getElementById('contentText'),
@@ -693,6 +789,9 @@ function init() {
   initTextExpansion();
 
   renderHistory();
+  
+  // 初始化状态显示
+  updateVoiceStatusDisplay();
 
   // 首次使用时自动弹出设置模态框
   if (isFirstTimeUser()) {
@@ -746,21 +845,169 @@ function initVoiceSelector() {
   el.voiceSelector.addEventListener('change', (e) => {
     const selectedVoice = e.target.value;
     const voiceName = e.target.options[e.target.selectedIndex].textContent;
+    const isClonedVoice = selectedVoice && !selectedVoice.startsWith('zh_');
     
-    console.log('语音选择器变更:', {
+    // 详细调试日志
+    console.log('🎵 语音选择器变更 - 详细信息:', {
       selectedVoice,
       voiceName,
-      isClonedVoice: selectedVoice && !selectedVoice.startsWith('zh_')
+      isClonedVoice,
+      previousVoiceType: state.voiceType,
+      currentEmotion: el.mood.value,
+      timestamp: new Date().toISOString()
     });
     
+    // 更新state
+    const oldVoiceType = state.voiceType;
     state.voiceType = selectedVoice;
 
     // 保存到localStorage
     storage.set('ve_voice_type', selectedVoice);
     
+    // 验证保存是否成功
+    const savedVoice = storage.get('ve_voice_type');
+    console.log('💾 语音保存验证:', {
+      intended: selectedVoice,
+      saved: savedVoice,
+      success: savedVoice === selectedVoice
+    });
+    
     // 显示当前选择的语音
     showSuccess(`已选择语音：${voiceName}`);
+    
+    // 更新状态显示
+    updateVoiceStatusDisplay();
+    
+    console.log('✅ 语音切换完成:', {
+      from: oldVoiceType,
+      to: selectedVoice,
+      type: isClonedVoice ? '复刻声音' : '预设声音'
+    });
   });
+  
+  // 为情绪选择器添加change事件监听器
+  el.mood.addEventListener('change', (e) => {
+    const selectedEmotion = e.target.value;
+    const emotionName = selectedEmotion === 'happy' ? '开心' : '中性';
+    
+    console.log('😊 情绪选择器变更:', {
+      selectedEmotion,
+      emotionName,
+      currentVoice: state.voiceType,
+      timestamp: new Date().toISOString()
+    });
+    
+    // 更新状态显示
+    updateVoiceStatusDisplay();
+    
+    showSuccess(`已选择情绪：${emotionName}`);
+   });
+   
+   // 为测试按钮添加事件监听器
+   el.testVoiceSettings.addEventListener('click', testCurrentVoiceSettings);
+}
+
+// 测试当前语音设置
+async function testCurrentVoiceSettings() {
+  // 配置验证
+  const configCheck = validateVoiceConfiguration();
+  if (!configCheck.isValid) {
+    const errorMsg = `配置验证失败：\n${configCheck.issues.join('\n')}`;
+    console.error('❌ 测试前配置验证失败:', configCheck);
+    showError(errorMsg + '\n\n请检查设置并重新配置。');
+    return;
+  }
+  
+  const testTexts = [
+    '这是一段测试语音，用来验证当前的语音设置是否正常工作。',
+    '亲爱的宝贝，妈妈在这里陪着你。',
+    '今天天气真好，阳光温暖地照在身上。'
+  ];
+  
+  const randomText = testTexts[Math.floor(Math.random() * testTexts.length)];
+  
+  try {
+    setLoading(el.testVoiceSettings, true);
+    
+    const currentVoice = state.voiceType || 'zh_female_roumeinvyou_emo_v2_mars_bigtts';
+    const currentEmotion = el.mood.value || 'neutral';
+    const isClonedVoice = currentVoice && !currentVoice.startsWith('zh_');
+    
+    console.log('🧪 开始测试语音设置:', {
+      voice: currentVoice,
+      emotion: currentEmotion,
+      isCloned: isClonedVoice,
+      testText: randomText,
+      timestamp: new Date().toISOString()
+    });
+    
+    const payload = {
+      text: randomText,
+      voice_type: currentVoice,
+      emotion: currentEmotion,
+      quality: 'draft'
+    };
+    
+    console.log('🧪 测试payload:', payload);
+    
+    showSuccess('正在测试语音设置...');
+    
+    // 根据语音类型选择合适的TTS函数
+    const data = isClonedVoice ? 
+      await voiceCloneTTSSynthesize(payload) : 
+      await ttsSynthesize(payload);
+    
+    console.log('🧪 测试API响应:', {
+      success: !!data,
+      hasAudio: !!(data?.data || data?.audio),
+      mode: data?.mode,
+      voice_type: data?.voice_type
+    });
+    
+    // 处理音频数据
+    let audioBase64;
+    if (data.data && typeof data.data === 'string') {
+      audioBase64 = data.data;
+    } else if (data.data && data.data.audio) {
+      audioBase64 = data.data.audio;
+    } else if (data.audio) {
+      audioBase64 = data.audio;
+    } else {
+      throw new Error('未找到音频数据');
+    }
+    
+    const audioBytes = base64ToBytes(audioBase64);
+    const mimeType = data.encoding ? (data.encoding === 'wav' ? 'audio/wav' : 'audio/mpeg') : detectAudioMimeType(audioBytes);
+    const blob = new Blob([audioBytes], { type: mimeType });
+    
+    // 创建临时音频播放器
+    const tempAudio = new Audio();
+    tempAudio.src = URL.createObjectURL(blob);
+    tempAudio.play();
+    
+    const voiceName = getVoiceTypeName(currentVoice);
+    const emotionName = currentEmotion === 'happy' ? '开心' : '中性';
+    
+    showSuccess(`✅ 语音测试成功！当前设置：${voiceName} - ${emotionName}`);
+    
+    console.log('✅ 语音测试完成:', {
+      voice: voiceName,
+      emotion: emotionName,
+      audioSize: audioBytes.length,
+      mimeType
+    });
+    
+    // 清理资源
+    tempAudio.addEventListener('ended', () => {
+      URL.revokeObjectURL(tempAudio.src);
+    });
+    
+  } catch (error) {
+    console.error('❌ 语音测试失败:', error);
+    showError(`语音测试失败: ${error.message}`);
+  } finally {
+    setLoading(el.testVoiceSettings, false);
+  }
 }
 
 // 加载复刻声音到语音选择器
@@ -1100,9 +1347,22 @@ async function previewContent() {
     console.log('是否为复刻声音:', isClonedVoice);
     
     // 根据语音类型选择合适的TTS函数
+    console.log(`🚀 调用TTS函数: ${isClonedVoice ? 'voiceCloneTTSSynthesize' : 'ttsSynthesize'}`);
+    
     const data = isClonedVoice ? 
       await voiceCloneTTSSynthesize(payload) : 
       await ttsSynthesize(payload);
+    
+    // API响应调试日志
+    console.log('📡 TTS API响应:', {
+      hasData: !!data,
+      dataKeys: data ? Object.keys(data) : [],
+      mode: data?.mode,
+      encoding: data?.encoding,
+      voice_type: data?.voice_type,
+      hasAudioData: !!(data?.data || data?.audio),
+      timestamp: new Date().toISOString()
+    });
     
     let audioBase64;
     let blob;
@@ -1184,6 +1444,16 @@ el.generateAudio.addEventListener('click', async() => {
     alert('请先生成文本内容');
     return;
   }
+  
+  // 配置验证
+  const configCheck = validateVoiceConfiguration();
+  if (!configCheck.isValid) {
+    const errorMsg = `配置验证失败：\n${configCheck.issues.join('\n')}`;
+    console.error('❌ 配置验证失败:', configCheck);
+    alert(errorMsg + '\n\n请检查设置并重新配置。');
+    return;
+  }
+  
   setLoading(el.generateAudio, true);
   try {
     // 判断是否为复刻声音
@@ -1206,8 +1476,39 @@ el.generateAudio.addEventListener('click', async() => {
       quality: 'draft'
     };
     
-    console.log('生成语音参数:', payload);
-    console.log('是否为复刻声音:', isClonedVoice);
+    // 详细的参数调试日志
+    console.log('🎤 开始生成语音 - 详细参数:', {
+      payload,
+      isClonedVoice,
+      currentState: {
+        voiceType: state.voiceType,
+        lastContent: state.lastContent ? state.lastContent.substring(0, 100) + '...' : null,
+        testMode: state.testMode
+      },
+      uiElements: {
+        selectedVoice: el.voiceSelector.value,
+        selectedMood: el.mood.value,
+        voiceSelectorText: el.voiceSelector.options[el.voiceSelector.selectedIndex]?.textContent
+      },
+      timestamp: new Date().toISOString()
+    });
+    
+    // 参数验证
+    const paramValidation = {
+      hasText: !!payload.text,
+      hasVoiceType: !!payload.voice_type,
+      hasEmotion: !!payload.emotion,
+      textLength: payload.text ? payload.text.length : 0,
+      voiceTypeValid: payload.voice_type && payload.voice_type.length > 0,
+      emotionValid: ['happy', 'neutral'].includes(payload.emotion)
+    };
+    
+    console.log('✅ 参数验证结果:', paramValidation);
+    
+    if (!paramValidation.hasText || !paramValidation.voiceTypeValid || !paramValidation.emotionValid) {
+      console.error('❌ 参数验证失败:', paramValidation);
+      throw new Error('参数验证失败：缺少必要参数或参数格式错误');
+    }
     
     // 根据语音类型选择合适的TTS函数
     const data = isClonedVoice ? 

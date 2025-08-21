@@ -382,11 +382,19 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
         if not self.validate_text(text):
             raise ValueError("Invalid text input")
         
+        # 提取emotion参数
+        emotion = kwargs.get('emotion', 'neutral')
+        
         # 获取音色配置
         voice_config = self._get_voice_config(voice_type, quality)
         
         # 根据声音类型选择正确的cluster
         cluster = self._get_cluster_for_voice(voice_type)
+        
+        # 如果voice_type不是以zh_开头，说明是复刻声音，直接使用该ID
+        actual_voice_type = voice_type if not voice_type.startswith('zh_') else voice_config["voice_type"]
+        
+        print(f"[PROD_ADAPTER DEBUG] Using voice_type: {actual_voice_type}, emotion: {emotion}, cluster: {cluster}")
         
         # 构建请求负载 - 按照官方文档格式
         payload = {
@@ -399,7 +407,7 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                 "uid": "prenatal_education_user"
             },
             "audio": {
-                "voice_type": voice_config["voice_type"],
+                "voice_type": actual_voice_type,
                 "encoding": voice_config["encoding"],
                 "speed_ratio": voice_config["speed_ratio"],
                 "volume_ratio": voice_config["volume_ratio"],
@@ -413,6 +421,11 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                 "enable_subtitle": False
             }
         }
+        
+        # 如果是多情感语音且指定了emotion，添加emotion参数
+        if emotion and emotion != 'neutral' and ('emo' in actual_voice_type or not actual_voice_type.startswith('zh_')):
+            payload["audio"]["emotion"] = emotion
+            print(f"[PROD_ADAPTER DEBUG] Added emotion parameter: {emotion}")
         
         return self._make_request_with_retry(payload)
     

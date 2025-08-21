@@ -185,8 +185,13 @@ class handler(BaseHTTPRequestHandler):
             # 提取参数
             text = data.get("text", "").strip()
             voice_type = data.get("voice_type", "zh_female_qingxin")
+            emotion = data.get("emotion", "neutral")  # happy 或 neutral
             quality = data.get("quality", "draft")  # draft 或 high
             dry_run_param = data.get("dry_run", False)
+            
+            # 添加参数调试日志
+            print(f"[TTS DEBUG] Request parameters: text_length={len(text)}, voice_type={voice_type}, emotion={emotion}, quality={quality}")
+            print(f"[TTS DEBUG] Request ID: {request_id}")
             
             # 检查是否为干跑模式
             is_dry_run_mode = is_dry_run() or dry_run_param
@@ -318,7 +323,7 @@ class handler(BaseHTTPRequestHandler):
             
             # 检查缓存
             cache = get_tts_cache()
-            params = {"quality": quality}
+            params = {"quality": quality, "emotion": emotion}
             cached_audio = cache.get(text, voice_type, params)
             
             if cached_audio:
@@ -358,7 +363,8 @@ class handler(BaseHTTPRequestHandler):
             
             # 调用语音合成服务
             try:
-                audio_data = speech_service.synthesize(text, voice_type=voice_type, quality=quality)
+                print(f"[TTS DEBUG] Calling synthesize with: voice_type={voice_type}, emotion={emotion}, quality={quality}")
+                audio_data = speech_service.synthesize(text, voice_type=voice_type, emotion=emotion, quality=quality)
                 
                 # 缓存结果
                 cache.set(text, audio_data, voice_type, params)
