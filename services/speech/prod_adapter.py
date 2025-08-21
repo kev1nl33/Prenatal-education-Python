@@ -83,7 +83,7 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
         # 普通TTS使用volcano_tts
         return "volcano_tts"
     
-    def _make_request_with_retry(self, payload: Dict[str, Any]) -> bytes:
+    def _make_request_with_retry(self, payload: Dict[str, Any], is_voice_clone: bool = False) -> bytes:
         """带重试的请求"""
         last_exception = None
         
@@ -91,13 +91,22 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
             try:
                 # 构建请求
                 req_data = json.dumps(payload).encode("utf-8")
+                
+                # 为复刻声音使用特殊的请求头
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer;{self.access_token}"
+                }
+                
+                # 复刻声音需要特殊的Resource-Id头
+                if is_voice_clone:
+                    headers["Resource-Id"] = "volc.megatts.voiceclone"
+                    print(f"[PROD_ADAPTER DEBUG] Added Resource-Id header for voice clone")
+                
                 req = urllib.request.Request(
                     self.api_url,
                     data=req_data,
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bearer;{self.access_token}"
-                    }
+                    headers=headers
                 )
                 
                 # Debug: 请求信息
@@ -315,24 +324,47 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                 last_exception = e
                 error_body = e.read().decode('utf-8') if e.fp else str(e)
                 
+                # 添加详细的错误日志
+                print(f"[PROD_ADAPTER ERROR] HTTP {e.code} on attempt {attempt + 1}: {error_body}")
+                if is_voice_clone:
+                    print(f"[PROD_ADAPTER ERROR] Voice clone request failed with HTTP {e.code}")
+                
                 # 根据错误码决定是否重试
                 if e.code in [429, 500, 502, 503, 504] and attempt < self.max_retries:
                     # 指数退避 + 抖动
                     delay = (2 ** attempt) + random.uniform(0, 1)
+                    print(f"[PROD_ADAPTER DEBUG] Retrying in {delay:.1f}s...")
                     time.sleep(delay)
                     continue
                 else:
                     # 不重试的错误或已达最大重试次数
                     if e.code == 401:
-                        raise Exception("Authentication failed: Invalid access token")
+                        if is_voice_clone:
+                            raise Exception("Voice clone authentication failed: Invalid access token or missing Resource-Id header")
+                        else:
+                            raise Exception("Authentication failed: Invalid access token")
                     elif e.code == 403:
-                        raise Exception("Access forbidden: Check your permissions")
+                        if is_voice_clone:
+                            raise Exception("Voice clone access forbidden: Check your voice clone permissions and Resource-Id")
+                        else:
+                            raise Exception("Access forbidden: Check your permissions")
                     elif e.code == 429:
                         raise Exception("Rate limit exceeded: Please try again later")
                     elif e.code in [400, 422]:
-                        raise Exception(f"Invalid request: {error_body}")
+                        if is_voice_clone:
+                            raise Exception(f"Invalid voice clone request: {error_body}. Please check voice ID format and parameters.")
+                        else:
+                            raise Exception(f"Invalid request: {error_body}")
+                    elif e.code == 500:
+                        if is_voice_clone:
+                            raise Exception(f"Voice clone server error: The voice ID may be invalid, expired, or not properly trained. Error details: {error_body}")
+                        else:
+                            raise Exception(f"TTS service error ({e.code}): {error_body}")
                     else:
-                        raise Exception(f"TTS service error ({e.code}): {error_body}")
+                        if is_voice_clone:
+                            raise Exception(f"Voice clone service error ({e.code}): {error_body}")
+                        else:
+                            raise Exception(f"TTS service error ({e.code}): {error_body}")
                         
             except urllib.error.URLError as e:
                 last_exception = e
@@ -377,6 +409,18 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
         # 如果所有重试都失败了
         raise Exception(f"TTS request failed after {self.max_retries + 1} attempts: {str(last_exception)}")
     
+    def _validate_voice_clone_id(self, voice_id: str) -> bool:
+        """验证复刻声音ID格式"""
+        if not voice_id:
+            return False
+        # 复刻声音ID通常以S_开头
+        if not voice_id.startswith('S_'):
+            return False
+        # 检查ID长度和格式
+        if len(voice_id) < 5 or len(voice_id) > 50:
+            return False
+        return True
+    
     def synthesize(self, text: str, voice_type: str = "default", quality: str = "draft", **kwargs) -> bytes:
         """合成语音"""
         if not self.validate_text(text):
@@ -385,6 +429,15 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
         # 提取emotion参数
         emotion = kwargs.get('emotion', 'neutral')
         
+        # 检查是否为复刻声音
+        is_voice_clone = voice_type and not voice_type.startswith('zh_')
+        
+        # 验证复刻声音ID
+        if is_voice_clone:
+            if not self._validate_voice_clone_id(voice_type):
+                raise ValueError(f"Invalid voice clone ID format: {voice_type}. Voice clone IDs should start with 'S_' and be 5-50 characters long.")
+            print(f"[PROD_ADAPTER DEBUG] Validated voice clone ID: {voice_type}")
+        
         # 获取音色配置
         voice_config = self._get_voice_config(voice_type, quality)
         
@@ -392,9 +445,9 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
         cluster = self._get_cluster_for_voice(voice_type)
         
         # 如果voice_type不是以zh_开头，说明是复刻声音，直接使用该ID
-        actual_voice_type = voice_type if not voice_type.startswith('zh_') else voice_config["voice_type"]
+        actual_voice_type = voice_type if is_voice_clone else voice_config["voice_type"]
         
-        print(f"[PROD_ADAPTER DEBUG] Using voice_type: {actual_voice_type}, emotion: {emotion}, cluster: {cluster}")
+        print(f"[PROD_ADAPTER DEBUG] Using voice_type: {actual_voice_type}, emotion: {emotion}, cluster: {cluster}, is_voice_clone: {is_voice_clone}")
         
         # 构建请求负载 - 按照官方文档格式
         payload = {
@@ -423,11 +476,12 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
         }
         
         # 如果是多情感语音且指定了emotion，添加emotion参数
-        if emotion and emotion != 'neutral' and ('emo' in actual_voice_type or not actual_voice_type.startswith('zh_')):
+        if emotion and emotion != 'neutral' and ('emo' in actual_voice_type or is_voice_clone):
             payload["audio"]["emotion"] = emotion
             print(f"[PROD_ADAPTER DEBUG] Added emotion parameter: {emotion}")
         
-        return self._make_request_with_retry(payload)
+        # 为复刻声音调用添加特殊处理
+        return self._make_request_with_retry(payload, is_voice_clone=is_voice_clone)
     
     def estimate_cost(self, text: str, voice_type: str = "default", quality: str = "draft", **kwargs) -> float:
         """估算费用"""

@@ -2350,6 +2350,27 @@ async function testVoiceConnection(speakerId) {
   const testText = "测试声音连接，这是一段简短的测试文本。";
   
   try {
+    console.log(`[TEST] 开始测试声音连接: ${speakerId}`);
+    
+    // 检查是否为复刻声音
+    const isClonedVoice = speakerId && !speakerId.startsWith('zh_');
+    
+    // 验证复刻声音ID格式
+    if (isClonedVoice) {
+      if (!speakerId.startsWith('S_')) {
+        return { 
+          success: false, 
+          message: '复刻声音ID格式错误：应以"S_"开头' 
+        };
+      }
+      if (speakerId.length < 5 || speakerId.length > 50) {
+        return { 
+          success: false, 
+          message: '复刻声音ID长度错误：应为5-50个字符' 
+        };
+      }
+    }
+    
     const payload = {
       text: testText,
       voice_type: speakerId,
@@ -2357,26 +2378,51 @@ async function testVoiceConnection(speakerId) {
       quality: 'draft'
     };
     
-    // 判断是否为复刻声音
-    const isClonedVoice = speakerId && !speakerId.startsWith('zh_');
-    console.log('测试连接参数:', payload);
-    console.log('是否为复刻声音:', isClonedVoice);
+    console.log(`[TEST] 测试参数:`, payload);
+    console.log(`[TEST] 是否为复刻声音:`, isClonedVoice);
     
     // 根据语音类型选择合适的TTS函数
     const data = isClonedVoice ? 
       await voiceCloneTTSSynthesize(payload) : 
       await ttsSynthesize(payload);
     
+    console.log(`[TEST] API响应:`, data);
+    
     // 验证返回数据
     if (data.data || data.audio) {
-      return { success: true, message: '声音连接测试成功' };
+      const message = isClonedVoice ? 
+        '复刻声音连接测试成功！声音ID有效且可正常使用。' : 
+        '预设声音连接测试成功！';
+      return { success: true, message };
     } else {
-      return { success: false, message: '声音连接测试失败：未返回音频数据' };
+      return { 
+        success: false, 
+        message: '声音连接测试失败：API未返回音频数据，请检查配置' 
+      };
     }
     
   } catch (error) {
     console.error('声音连接测试失败:', error);
-    return { success: false, message: `声音连接测试失败: ${error.message}` };
+    
+    // 提供更详细的错误信息
+    let errorMessage = error.message || '未知错误';
+    
+    if (errorMessage.includes('Voice clone server error')) {
+      errorMessage = '复刻声音服务器错误：声音ID可能无效、已过期或未完成训练';
+    } else if (errorMessage.includes('Authentication failed') || errorMessage.includes('Voice clone authentication failed')) {
+      errorMessage = '认证失败：请检查API配置或声音复刻权限';
+    } else if (errorMessage.includes('Invalid voice clone request')) {
+      errorMessage = '复刻声音请求无效：请检查声音ID格式和参数';
+    } else if (errorMessage.includes('timeout')) {
+      errorMessage = '请求超时：服务器响应时间过长，请稍后重试';
+    } else if (errorMessage.includes('500')) {
+      errorMessage = '服务器内部错误：复刻声音可能无效或服务暂时不可用';
+    }
+    
+    return { 
+      success: false, 
+      message: `声音连接测试失败: ${errorMessage}` 
+    };
   }
 }
 
