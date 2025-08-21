@@ -552,6 +552,10 @@ async function arkGenerate(prompt, model) {
     const headers = {
       'Content-Type': 'application/json'
     };
+    // 添加认证头（如果配置了API密钥）
+    if (state.textApiKey) {
+      headers['X-Auth-Token'] = state.textApiKey;
+    }
 
     // 添加认证头（如果配置了API密钥）
     if (state.textApiKey) {
@@ -644,6 +648,10 @@ async function ttsSynthesize(payload) {
     const headers = {
       'Content-Type': 'application/json'
     };
+    // 添加认证头（如果配置了API密钥）
+    if (state.textApiKey) {
+      headers['X-Auth-Token'] = state.textApiKey;
+    }
 
     // 根据文本长度调整超时时间
     const textLength = payload.text ? payload.text.length : 0;
@@ -1854,6 +1862,10 @@ async function voiceCloneAPI(action, data = {}) {
     const headers = {
       'Content-Type': 'application/json'
     };
+    // 添加认证头（如果配置了API密钥）
+    if (state.textApiKey) {
+      headers['X-Auth-Token'] = state.textApiKey;
+    }
 
     const payload = {
       action: action,
@@ -1886,7 +1898,11 @@ async function voiceCloneAPI(action, data = {}) {
 // 获取已复刻声音列表
 async function getClonedVoices() {
   try {
-    const response = await fetch(`${API_BASE}/api/voice_clone?action=list`);
+    const headers = {};
+    if (state.textApiKey) {
+      headers['X-Auth-Token'] = state.textApiKey;
+    }
+    const response = await fetch(`${API_BASE}/api/voice_clone?action=list`, { headers });
     const data = await response.json();
     
     if (!response.ok) {
@@ -1903,7 +1919,11 @@ async function getClonedVoices() {
 // 查询训练状态
 async function getTrainingStatus(speakerId) {
   try {
-    const response = await fetch(`${API_BASE}/api/voice_clone?action=status&speaker_id=${speakerId}`);
+    const headers = {};
+    if (state.textApiKey) {
+      headers['X-Auth-Token'] = state.textApiKey;
+    }
+    const response = await fetch(`${API_BASE}/api/voice_clone?action=status&speaker_id=${speakerId}`, { headers });
     const data = await response.json();
     
     if (!response.ok) {
@@ -2235,6 +2255,10 @@ async function voiceCloneTTSSynthesize(payload) {
     const headers = {
       'Content-Type': 'application/json'
     };
+    // 添加认证头（如果配置了API密钥）
+    if (state.textApiKey) {
+      headers['X-Auth-Token'] = state.textApiKey;
+    }
     
     // 修改payload以使用声音复刻配置
     const voiceClonePayload = {

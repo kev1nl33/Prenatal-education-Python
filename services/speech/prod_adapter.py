@@ -18,8 +18,19 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
         self.app_id = os.environ.get('TTS_APP_ID', '')
         self.access_token = os.environ.get('TTS_ACCESS_TOKEN', '')
         self.api_url = os.environ.get('TTS_API_URL', 'https://openspeech.bytedance.com/api/v1/tts')
-        # 声音复刻API可能使用不同的端点
+        # 声音复刻API端点（2.0）
         self.voice_clone_api_url = os.environ.get('VOICE_CLONE_API_URL', 'https://openspeech.bytedance.com/api/v1/tts')
+        # 兼容旧配置，自动推导 upload/status 端点
+        _base = self.voice_clone_api_url
+        if _base.endswith('/api/v1/tts'):
+            _base = _base[: -len('/api/v1/tts')]
+        _base = _base.rstrip('/')
+        self.voice_clone_upload_url = os.environ.get(
+            'VOICE_CLONE_UPLOAD_URL', f"{_base}/api/v1/mega_tts/audio/upload"
+        )
+        self.voice_clone_status_url = os.environ.get(
+            'VOICE_CLONE_STATUS_URL', f"{_base}/api/v1/mega_tts/status"
+        )
         
         # 价格配置
         self.price_per_1k_char = float(os.environ.get('TTS_PRICE_PER_1K_CHAR', '0.02'))
@@ -31,7 +42,7 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
         
         if not self.app_id or not self.access_token:
             raise ValueError("TTS_APP_ID and TTS_ACCESS_TOKEN must be set in environment variables")
-    
+
     def _build_ssl_context(self):
         """构建SSL上下文"""
         try:
@@ -42,7 +53,7 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                 return ssl._create_unverified_context()
             except Exception:
                 return None
-    
+
     def _get_voice_config(self, voice_type: str, quality: str) -> Dict[str, Any]:
         """获取音色配置"""
         # 音色映射 - 使用官方文档中的正确格式
@@ -74,7 +85,7 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
         config["voice_type"] = voice_mapping.get(voice_type, voice_mapping["default"])
         
         return config
-    
+
     def _get_cluster_for_voice(self, voice_type: str) -> str:
         """根据声音类型获取正确的cluster配置"""
         # 如果是复刻声音（非预设声音），使用volcano_icl
@@ -82,9 +93,11 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
             return "volcano_icl"
         # 普通TTS使用volcano_tts
         return "volcano_tts"
-    
+
     def _make_request_with_retry(self, payload: Dict[str, Any], is_voice_clone: bool = False) -> bytes:
-        """带重试的请求"""
+        """带重试的请求
+        注意：is_voice_clone=True 仅用于声音复刻相关接口需要的特殊头部，不用于TTS合成。
+        """
         last_exception = None
         
         for attempt in range(self.max_retries + 1):
@@ -92,13 +105,13 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                 # 构建请求
                 req_data = json.dumps(payload).encode("utf-8")
                 
-                # 为复刻声音使用特殊的请求头
+                # 构建请求头
                 headers = {
                     "Content-Type": "application/json",
-                    "Authorization": f"Bearer;{self.access_token}"
+                    "Authorization": f"Bearer {self.access_token}"
                 }
                 
-                # 复刻声音需要特殊的Resource-Id头
+                # 仅在调用声音复刻相关接口时设置 Resource-Id
                 if is_voice_clone:
                     headers["Resource-Id"] = "volc.megatts.voiceclone"
                     print(f"[PROD_ADAPTER DEBUG] Added Resource-Id header for voice clone")
@@ -166,7 +179,7 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                                         data=q_req_data,
                                         headers={
                                             "Content-Type": "application/json",
-                                            "Authorization": f"Bearer;{self.access_token}"
+                                            "Authorization": f"Bearer {self.access_token}"
                                         }
                                     )
                                     print(f"[PROD_ADAPTER DEBUG] Query request headers: {dict(q_req.headers)}")
@@ -480,8 +493,8 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
             payload["audio"]["emotion"] = emotion
             print(f"[PROD_ADAPTER DEBUG] Added emotion parameter: {emotion}")
         
-        # 为复刻声音调用添加特殊处理
-        return self._make_request_with_retry(payload, is_voice_clone=is_voice_clone)
+        # TTS 请求不需要声音复刻的 Resource-Id 头部
+        return self._make_request_with_retry(payload, is_voice_clone=False)
     
     def estimate_cost(self, text: str, voice_type: str = "default", quality: str = "draft", **kwargs) -> float:
         """估算费用"""
@@ -511,47 +524,50 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
     
     def voice_clone(self, speaker_id: str, audio_data: bytes, audio_format: str = "wav", 
                    language: str = "zh", model_type: int = 1, **kwargs) -> Dict[str, Any]:
-        """声音复刻"""
+        """声音复刻（2.0 上传训练接口）"""
         try:
-            # 构建请求payload - 根据火山引擎官方文档
+            # 语言映射到文档中的枚举值
+            lang_map = {"zh": 0, "cn": 0, "en": 1, "ja": 2, "es": 3, "id": 4, "pt": 5, "de": 6, "fr": 7}
+            if isinstance(language, int):
+                language_val = language
+            else:
+                language_val = lang_map.get(str(language).lower(), 0)
+            
+            # extra_params 需要为 json 字符串
+            extra_params = kwargs.get("extra_params") or {}
+            if isinstance(extra_params, str):
+                extra_params_str = extra_params
+            else:
+                extra_params_str = json.dumps(extra_params, ensure_ascii=False)
+            
+            audio_item: Dict[str, Any] = {
+                "audio_bytes": base64.b64encode(audio_data).decode('utf-8'),
+                "audio_format": audio_format
+            }
+            if kwargs.get("text"):
+                audio_item["text"] = str(kwargs.get("text"))
+            
+            # 构建请求payload - 声音复刻2.0
             payload = {
-                "app": {
-                    "appid": self.app_id,
-                    "token": self.access_token,
-                    "cluster": "volcano_icl"  # 声音复刻2.0使用volcano_icl
-                },
-                "user": {
-                    "uid": "test_user"
-                },
-                "audio": {
-                    "voice_type": "custom",
-                    "encoding": "wav",
-                    "speed_ratio": 1.0,
-                    "volume_ratio": 1.0,
-                    "pitch_ratio": 1.0
-                },
-                "request": {
-                    "reqid": f"voice_clone_{int(time.time() * 1000)}",
-                    "operation": "submit",
-                    "speaker_id": speaker_id,
-                    "audios": [base64.b64encode(audio_data).decode('utf-8')],
-                    "source": "api",
-                    "language": language,
-                    "model_type": model_type,  # 1=ICL, 2=DiT标准版, 3=DiT还原版
-                    "extra_params": kwargs.get("extra_params", {})
-                }
+                "appid": self.app_id,
+                "speaker_id": speaker_id,
+                "audios": [audio_item],
+                "source": 2,
+                "language": language_val,
+                "model_type": model_type,
+                "extra_params": extra_params_str
             }
             
-            print(f"[VOICE_CLONE DEBUG] Voice clone payload: {json.dumps(payload, indent=2, ensure_ascii=False)}")
+            print(f"[VOICE_CLONE DEBUG] Voice clone (upload) payload: {json.dumps(payload, indent=2, ensure_ascii=False)}")
             
             # 发送请求
             req_data = json.dumps(payload).encode("utf-8")
             req = urllib.request.Request(
-                self.voice_clone_api_url,
+                self.voice_clone_upload_url,
                 data=req_data,
                 headers={
                     "Content-Type": "application/json",
-                    "Authorization": f"Bearer;{self.access_token}",
+                    "Authorization": f"Bearer {self.access_token}",
                     "Resource-Id": "volc.megatts.voiceclone"  # 声音复刻专用Resource-Id
                 }
             )
@@ -561,26 +577,24 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                 response_data = response.read()
                 json_response = json.loads(response_data.decode("utf-8"))
                 
-                print(f"[VOICE_CLONE DEBUG] Voice clone response: {json.dumps(json_response, indent=2, ensure_ascii=False)}")
+                print(f"[VOICE_CLONE DEBUG] Voice clone (upload) response: {json.dumps(json_response, indent=2, ensure_ascii=False)}")
                 
-                if json_response.get("code") == 0:
+                base_resp = json_response.get("BaseResp") or {}
+                status_code = base_resp.get("StatusCode")
+                if status_code == 0 or json_response.get("code") == 0:
                     return {
                         "success": True,
                         "speaker_id": speaker_id,
-                        "task_id": json_response.get("reqid", payload["request"]["reqid"]),
                         "status": "submitted",
-                        "message": "Voice cloning task submitted successfully"
+                        "message": base_resp.get("StatusMessage", "")
                     }
                 else:
-                    error_msg = json_response.get("message", "Unknown error")
-                    error_code = json_response.get("code")
-                    print(f"[VOICE_CLONE ERROR] API returned error code {error_code}: {error_msg}")
+                    error_msg = base_resp.get("StatusMessage") or json_response.get("message", "Unknown error")
                     return {
                         "success": False,
-                        "error": f"Voice clone failed: {error_msg}",
-                        "code": error_code
+                        "error": f"Voice clone upload failed: {error_msg}",
+                        "code": status_code or json_response.get("code")
                     }
-                    
         except urllib.error.HTTPError as e:
             error_body = e.read().decode('utf-8') if e.fp else str(e)
             print(f"[VOICE_CLONE ERROR] HTTP {e.code}: {error_body}")
@@ -612,30 +626,12 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
             }
     
     def get_voice_clone_status(self, speaker_id: str, **kwargs) -> Dict[str, Any]:
-        """查询声音复刻状态"""
+        """查询声音复刻状态（2.0 status接口）"""
         try:
-            # 构建查询请求payload
+            # 构建查询请求payload（2.0 文档规范）
             payload = {
-                "app": {
-                    "appid": self.app_id,
-                    "token": self.access_token,
-                    "cluster": "volcano_icl"
-                },
-                "user": {
-                    "uid": "test_user"
-                },
-                "audio": {
-                    "voice_type": "custom",
-                    "encoding": "wav"
-                },
-                "request": {
-                    "reqid": kwargs.get("task_id", f"status_{int(time.time() * 1000)}"),
-                    "operation": "query",
-                    "speaker_id": speaker_id,
-                    "text": "",  # query操作需要text字段
-                    "text_type": "plain",
-                    "enable_subtitle": False
-                }
+                "appid": self.app_id,
+                "speaker_id": speaker_id
             }
             
             print(f"[VOICE_CLONE DEBUG] Status query payload: {json.dumps(payload, indent=2, ensure_ascii=False)}")
@@ -643,11 +639,11 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
             # 发送请求
             req_data = json.dumps(payload).encode("utf-8")
             req = urllib.request.Request(
-                self.voice_clone_api_url,
+                self.voice_clone_status_url,
                 data=req_data,
                 headers={
                     "Content-Type": "application/json",
-                    "Authorization": f"Bearer;{self.access_token}",
+                    "Authorization": f"Bearer {self.access_token}",
                     "Resource-Id": "volc.megatts.voiceclone"  # 声音复刻专用Resource-Id
                 }
             )
@@ -659,25 +655,22 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                 
                 print(f"[VOICE_CLONE DEBUG] Status response: {json.dumps(json_response, indent=2, ensure_ascii=False)}")
                 
-                code = json_response.get("code")
+                base_resp = json_response.get("BaseResp") or {}
+                code = base_resp.get("StatusCode")
                 if code == 0:
+                    status_val = json_response.get("status")
+                    status_map = {0: "not_found", 1: "training", 2: "success", 3: "failed", 4: "active"}
+                    status_str = status_map.get(status_val, "unknown")
+                    progress = 100 if status_val in (2, 4) else 50 if status_val == 1 else 0
                     return {
                         "success": True,
                         "speaker_id": speaker_id,
-                        "status": "completed",
-                        "progress": 100,
-                        "message": "Voice cloning completed successfully"
-                    }
-                elif code == 3000 or code == 3001:
-                    return {
-                        "success": True,
-                        "speaker_id": speaker_id,
-                        "status": "training",
-                        "progress": 50,
-                        "message": "Voice cloning in progress"
+                        "status": status_str,
+                        "progress": progress,
+                        "message": base_resp.get("StatusMessage", "")
                     }
                 else:
-                    error_msg = json_response.get("message", "Unknown error")
+                    error_msg = base_resp.get("StatusMessage", "Unknown error")
                     print(f"[VOICE_CLONE ERROR] Status query API returned error code {code}: {error_msg}")
                     return {
                         "success": False,
