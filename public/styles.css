@@ -124,6 +124,18 @@ label { font-size: 13px; color: #475569; }
   color: #666;
   font-style: italic;
 }
+
+/* 信息提示文本 */
+.info-text {
+  font-size: 13px;
+  color: #4CAF50;
+  background: rgba(76, 175, 80, 0.1);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border-left: 3px solid #4CAF50;
+  margin: 8px 0;
+  line-height: 1.4;
+}
 input, select, textarea {
   width: 100%; padding: 10px 12px; border: 1px solid #E2E8F0; border-radius: 12px; background: #F8FAFC;
   outline: none; transition: border-color .2s, box-shadow .2s; font-size: 14px;

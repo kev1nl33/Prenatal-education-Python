@@ -78,12 +78,34 @@ X-Auth-Token: your_auth_token
 POST /api/tts
 Content-Type: application/json
 X-Auth-Token: your_auth_token
+X-Api-Resource-Id: your_resource_id  # 可选
 
 {
   "text": "要转换的文字内容",
-  "voice_type": "zh_female_xinlingjitang_moon_bigtts"
+  "voice_type": "zh_female_xinlingjitang_moon_bigtts",
+  "resource_id": "your_resource_id"  # 可选，Header 优先
 }
 ```
+
+#### Resource ID 配置
+
+Resource ID 是可选的资源标识符，用于访问特定的 TTS 资源或音色。
+
+**配置方式**：
+1. **前端界面配置**：在设置页面的「语音合成生成（TTS）」区域填写「Resource ID（可选）」
+2. **环境变量配置**：设置 `TTS_RESOURCE_ID` 环境变量
+3. **请求时指定**：通过 Header `X-Api-Resource-Id` 或 Body `resource_id` 字段传递
+
+**优先级**：Header > Body > 环境变量
+
+**格式要求**：
+- 仅允许字母、数字、下划线、连字符
+- 长度限制：1-128 字符
+- 示例：`my-resource-123`、`voice_model_v2`
+
+**缓存机制**：
+- 缓存键包含 Resource ID，不同 Resource ID 的请求会分别缓存
+- 相同文本 + 音色 + Resource ID 组合会命中缓存
 
 ## 故障排除
 
@@ -107,6 +129,82 @@ X-Auth-Token: your_auth_token
 3. **API调用失败**
    - 检查火山方舟API密钥是否有效
    - 检查TTS API令牌是否正确配置
+
+4. **Resource ID 相关错误**
+   
+   **错误信息**: `INVALID_RESOURCE_ID: Resource ID must contain only alphanumeric characters, underscores, and hyphens (1-128 chars)`
+   
+   **解决方案**: 
+   - 检查 Resource ID 格式，只能包含字母、数字、下划线、连字符
+   - 确保长度在 1-128 字符之间
+   - 示例正确格式：`my-resource-123`、`voice_model_v2`
+   
+   **错误信息**: `RESOURCE_NOT_FOUND: 访问受限：请求的语音资源未被授权或不存在`
+   
+   **解决方案**: 
+   - 检查 Resource ID 是否正确
+   - 确认账户是否有权限访问该资源
+   - 如果启用了降级模式（`TTS_FALLBACK_ON_RESOURCE_ERROR=true`），系统会自动回退到默认音色
+   - 联系服务提供商确认资源权限
+
+5. **缓存相关问题**
+   
+   **问题**: 更换 Resource ID 后仍返回旧的音频
+   
+   **解决方案**: 
+   - Resource ID 是缓存键的一部分，不同 Resource ID 会有独立缓存
+   - 如需清除缓存，可重启服务或等待缓存过期（默认7天）
+   - 检查前端是否正确传递了新的 Resource ID
+
+### 环境变量配置
+
+#### TTS 相关环境变量
+
+| 变量名 | 说明 | 默认值 | 示例 |
+|--------|------|--------|------|
+| `TTS_RESOURCE_ID` | 默认 Resource ID | 空 | `my-default-resource` |
+| `TTS_FALLBACK_ON_RESOURCE_ERROR` | 资源错误时是否降级到默认音色 | `false` | `true` |
+| `TTS_MAX_RETRIES` | 最大重试次数 | `2` | `3` |
+| `TTS_TIMEOUT` | 请求超时时间（秒） | `60` | `120` |
+
+### 可观测性与监控
+
+#### 日志格式
+
+系统会输出结构化日志，包含以下字段：
+
+```
+[TTS INFO] request_id=abc12345 session_id=def67890 resource_id_hash=xyz98765 cache_hit=true latency=0.123s retry_count=0
+```
+
+**字段说明**：
+- `request_id`: 请求唯一标识符
+- `session_id`: 会话标识符（hash8）
+- `resource_id_hash`: Resource ID 的哈希值（hash8，用于隐私保护）
+- `cache_hit`: 是否命中缓存
+- `latency`: 响应延迟（秒）
+- `retry_count`: 重试次数
+- `cost`: 费用（仅合成请求）
+
+#### 性能指标
+
+监控以下关键指标：
+- `tts_first_byte_latency`: 首字节延迟
+- `tts_total_latency`: 总延迟
+- `tts_error_rate`: 错误率
+- `cache_hit_rate`: 缓存命中率
+
+### 测试工具
+
+项目提供了测试脚本来验证 Resource ID 功能：
+
+```bash
+# 契约测试（验证各种 Resource ID 场景）
+python test_resource_id.py
+
+# 负载测试（验证性能和稳定性）
+python load_test.py
+```
 
 ## 技术栈
 

@@ -55,29 +55,22 @@
                         <div class="config-section">
                             <h3 class="section-title">🎵 语音合成生成</h3>
                             <div class="form-group">
-                                <label for="appId">TTS AppID:</label>
-                                <input type="text" id="appId" placeholder="请输入火山引擎TTS应用ID">
-                                <small class="form-hint">在火山引擎控制台创建TTS应用后获得</small>
+                                <label for="ttsApiKey">TTS API Key:</label>
+                                <input type="password" id="ttsApiKey" placeholder="请输入火山引擎TTS API Key">
+                                <small class="form-hint">在火山引擎控制台获取的TTS API密钥</small>
                             </div>
+
                             <div class="form-group">
-                                <label for="accessToken">TTS Access Token:</label>
-                                <input type="password" id="accessToken" placeholder="请输入TTS Access Token">
-                                <small class="form-hint">在火山引擎TTS控制台获取的访问令牌</small>
+                                <small class="info-text">💡 现在只需要配置TTS API Key即可使用所有语音功能，包括普通音色和复刻音色</small>
                             </div>
                         </div>
 
                         <!-- 声音复刻配置 -->
                         <div class="config-section">
-                            <h3 class="section-title">🎤 声音复刻</h3>
+                            <h3 class="section-title">� 声音复刻</h3>
+                            <!-- 声音复刻配置已简化，现在使用统一的TTS API配置 -->
                             <div class="form-group">
-                                <label for="voiceCloneAppId">声音复刻 AppID:</label>
-                                <input type="text" id="voiceCloneAppId" placeholder="请输入声音复刻专用AppID">
-                                <small class="form-hint">在火山引擎控制台创建声音复刻应用后获得的AppID</small>
-                            </div>
-                            <div class="form-group">
-                                <label for="voiceCloneAccessToken">声音复刻 Access Token:</label>
-                                <input type="password" id="voiceCloneAccessToken" placeholder="请输入声音复刻Access Token">
-                                <small class="form-hint">声音复刻功能的专用访问令牌，系统将自动配置cluster为volcano_icl</small>
+                                <small class="info-text">💡 声音复刻功能现在使用统一的TTS API配置，无需额外设置</small>
                             </div>
                         </div>
 
@@ -384,6 +377,33 @@
         </main>
     </div>
 
+    <script>
+        // 清理可能存在的Service Worker和缓存，解决POST请求缓存错误
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                    console.log('卸载Service Worker:', registration.scope);
+                    registration.unregister();
+                }
+            });
+        }
+        
+        // 清理缓存
+        if ('caches' in window) {
+            caches.keys().then(function(cacheNames) {
+                return Promise.all(
+                    cacheNames.map(function(cacheName) {
+                        console.log('删除缓存:', cacheName);
+                        return caches.delete(cacheName);
+                    })
+                );
+            }).then(function() {
+                console.log('所有缓存已清理完成');
+            });
+        }
+    </script>
+    <!-- 引入音频处理工具 -->
+    <script src="utils/audio.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

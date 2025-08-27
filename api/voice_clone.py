@@ -44,7 +44,7 @@ def _get_cors_headers(request_id=None, from_cache=False, cost_estimated=0.0, mod
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": allowed_origin,
         "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
-        "Access-Control-Allow-Headers": "Content-Type, X-Auth-Token, X-Req-Id, X-Mode, X-Dry-Run",
+        "Access-Control-Allow-Headers": "Content-Type, X-Auth-Token, X-Req-Id, X-Mode, X-Dry-Run, X-Api-Resource-Id",
     }
     
     # 添加自定义响应头

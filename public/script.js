@@ -1,5 +1,8 @@
 const API_BASE = ''; // 同源，不要写域名
 
+// 引入音频处理工具函数
+// 注意：在HTML中需要先加载 utils/audio.js
+
 // 简易本地存储封装
 const storage = {
   get(key, def) {
@@ -76,7 +79,7 @@ function analyzeError(error) {
     return {
       type: ErrorTypes.AUTH,
       userMessage: '认证失败，请检查API配置',
-      suggestion: '建议：1. 检查AppID和Access Token是否正确 2. 确认账户余额充足'
+      suggestion: '建议：1. 检查TTS API Key是否正确 2. 确认账户余额充足'
     };
   }
   
@@ -432,8 +435,8 @@ function validateVoiceConfiguration() {
     hasEmotion: !!el.mood.value,
     isValidVoiceType: currentVoice && currentVoice.length > 0,
     isValidEmotion: ['happy', 'neutral'].includes(el.mood.value),
-    hasCloneConfig: isClonedVoice ? (!!state.voiceCloneAppId && !!state.voiceCloneAccessToken) : true,
-    hasTTSConfig: !isClonedVoice ? (!!state.ttsAppId && !!state.accessToken) : true
+    // 声音复刻配置检查已移除，现在使用统一的TTS配置
+    hasTTSConfig: !!state.ttsApiKey
   };
   
   const issues = [];
@@ -446,12 +449,10 @@ function validateVoiceConfiguration() {
     issues.push('情绪设置无效');
   }
   
-  if (isClonedVoice && !validation.hasCloneConfig) {
-    issues.push('声音复刻配置缺失（需要AppID和AccessToken）');
-  }
+  // 声音复刻配置检查已移除
   
   if (!isClonedVoice && !validation.hasTTSConfig) {
-    issues.push('TTS配置缺失（需要AppID和AccessToken）');
+    issues.push('TTS配置缺失（需要TTS API Key）');
   }
   
   console.log('🔍 配置验证结果:', {
@@ -552,20 +553,18 @@ async function arkGenerate(prompt, model) {
     const headers = {
       'Content-Type': 'application/json'
     };
-    // 添加认证头（如果配置了API密钥）
-    if (state.textApiKey) {
-      headers['X-Auth-Token'] = state.textApiKey;
+    // Ark 文本生成仅使用文本模型 API Key
+    const authToken = state.textApiKey;
+    if (authToken) {
+      headers['X-Auth-Token'] = authToken;
     }
 
-    // 添加认证头（如果配置了API密钥）
-    if (state.textApiKey) {
-      headers['X-Auth-Token'] = state.textApiKey;
-    }
 
     const response = await fetch(`${API_BASE}/api/ark`, {
       method: 'POST',
       headers: headers,
-      body: JSON.stringify({ prompt, model })
+      body: JSON.stringify({ prompt, model }),
+      cache: 'no-store' // 明确禁用缓存
     });
 
     const data = await response.json();
@@ -608,7 +607,8 @@ async function fetchWithTimeoutAndRetry(url, options, timeout = 60000, maxRetrie
       
       const response = await fetch(url, {
         ...options,
-        signal: controller.signal
+        signal: controller.signal,
+        cache: 'no-store' // 明确禁用缓存，解决POST请求缓存错误
       });
       
       clearTimeout(timeoutId);
@@ -648,9 +648,10 @@ async function ttsSynthesize(payload) {
     const headers = {
       'Content-Type': 'application/json'
     };
-    // 添加认证头（如果配置了API密钥）
-    if (state.textApiKey) {
-      headers['X-Auth-Token'] = state.textApiKey;
+    // 为 TTS 优先使用 ttsApiKey，其次回退到 textApiKey
+    const authToken = state.ttsApiKey || state.textApiKey;
+    if (authToken) {
+      headers['X-Auth-Token'] = authToken;
     }
 
     // 根据文本长度调整超时时间
@@ -661,31 +662,128 @@ async function ttsSynthesize(payload) {
     
     console.log(`文本长度: ${textLength}, 超时设置: ${timeout/1000}秒`);
 
-    const response = await fetchWithTimeoutAndRetry(`${API_BASE}/api/tts`, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(payload)
-    }, timeout);
+    const bodyPayload = { ...payload };
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || `HTTP ${response.status}`);
-    }
-
-    if (data.error) {
-      throw new Error(data.error);
-    }
-
-    // 检查运行模式并显示警告
-    if (data.mode && data.mode !== 'prod') {
-      console.warn(`TTS运行在${data.mode}模式，可能生成占位音频`);
-      if (data.warning) {
-        console.warn(`警告: ${data.warning}`);
+    // 使用原生fetch而不是fetchWithTimeoutAndRetry，以便更好地处理响应类型
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
+    try {
+      const response = await fetch(`${API_BASE}/api/tts`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(bodyPayload),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        // 尝试解析错误响应
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          // 如果无法解析JSON，使用状态码
+        }
+        throw new Error(errorMessage);
       }
+      
+      // 读取响应头
+      const contentType = response.headers.get('content-type') || '';
+      console.info('TTS响应Content-Type:', contentType);
+      
+      // 根据Content-Type处理不同的响应格式
+      if (contentType.includes('application/json')) {
+        // JSON响应：包含Base64编码的音频数据
+        const data = await response.json();
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        // 检查运行模式并显示警告
+        if (data.mode && data.mode !== 'prod') {
+          console.warn(`TTS运行在${data.mode}模式，可能生成占位音频`);
+          if (data.warning) {
+            console.warn(`警告: ${data.warning}`);
+          }
+        }
+        
+        // 提取Base64音频数据
+        const base64Audio = data.data || data.audio_base64 || data.audio;
+        if (!base64Audio) {
+          throw new Error('TTS返回格式异常：未找到音频数据');
+        }
+        
+        console.info('TTS JSON响应处理:', {
+          hasData: !!data.data,
+          hasAudio: !!data.audio,
+          hasAudioBase64: !!data.audio_base64,
+          base64Length: base64Audio.length,
+          encoding: data.encoding,
+          source: 'json-base64',
+          note: 'tts-api'
+        });
+        
+        // 使用工具函数解码Base64
+        const audioBytes = safeBase64ToBytes(base64Audio);
+        const mimeType = detectAudioMimeType(null, 'audio/wav');
+        
+        // 根据服务器返回的编码信息调整MIME类型
+        if (data.encoding === 'wav') {
+          mimeType = 'audio/wav';
+        } else if (data.encoding === 'mp3' || data.encoding === 'mpeg') {
+          mimeType = 'audio/mpeg';
+        }
+        
+        console.info('TTS音频处理完成:', {
+          base64Length: base64Audio.length,
+          byteLength: audioBytes.length,
+          mime: mimeType,
+          source: 'json-base64',
+          note: 'tts-preview'
+        });
+        
+        return {
+          ...data,
+          audioBytes: audioBytes,
+          mimeType: mimeType,
+          source: 'json-base64'
+        };
+        
+      } else {
+        // 二进制响应：直接的音频流
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBytes = new Uint8Array(arrayBuffer);
+        const mimeType = detectAudioMimeType(contentType, 'audio/wav');
+        
+        console.info('TTS二进制响应处理:', {
+          byteLength: audioBytes.length,
+          mime: mimeType,
+          source: 'binary',
+          note: 'tts-preview',
+          contentType: contentType
+        });
+        
+        return {
+          ok: true,
+          audioBytes: audioBytes,
+          mimeType: mimeType,
+          source: 'binary',
+          encoding: mimeType.includes('wav') ? 'wav' : 'mpeg'
+        };
+      }
+      
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        throw new Error('请求超时，请稍后重试');
+      }
+      throw fetchError;
     }
-
-    return data;
+    
   } catch (error) {
     console.error('TTS API调用失败:', error);
     showError(`语音合成失败: ${error.message}`);
@@ -697,10 +795,9 @@ async function ttsSynthesize(payload) {
 const state = {
   textApiKey: storage.get('ve_text_api_key', ''),
   modelEndpoint: storage.get('ve_model_endpoint', ''),
-  ttsAppId: storage.get('ve_tts_appid', ''),
-  accessToken: storage.get('ve_access_token', ''),
-  voiceCloneAppId: storage.get('ve_voice_clone_appid', ''),
-  voiceCloneAccessToken: storage.get('ve_voice_clone_access_token', ''),
+  ttsApiKey: storage.get('ve_tts_api_key', ''),
+
+  // 声音复刻配置已移除，现在使用统一的TTS API配置
   voiceType: storage.get('ve_voice_type', 'zh_female_roumeinvyou_emo_v2_mars_bigtts'),
   testMode: storage.get('ve_test_mode', false),
   lastContent: '',
@@ -714,10 +811,9 @@ const state = {
 const el = {
   textApiKey: document.getElementById('textApiKey'),
   modelEndpoint: document.getElementById('modelEndpoint'),
-  ttsAppId: document.getElementById('appId'),
-  accessToken: document.getElementById('accessToken'),
-  voiceCloneAppId: document.getElementById('voiceCloneAppId'),
-  voiceCloneAccessToken: document.getElementById('voiceCloneAccessToken'),
+  ttsApiKey: document.getElementById('ttsApiKey'),
+
+  // 声音复刻DOM元素已移除
   testMode: document.getElementById('testMode'),
   saveConfig: document.getElementById('saveConfig'),
   contentType: document.getElementById('contentType'),
@@ -775,10 +871,9 @@ function isFirstTimeUser() {
 function init() {
   el.textApiKey.value = state.textApiKey;
   el.modelEndpoint.value = state.modelEndpoint;
-  el.ttsAppId.value = state.ttsAppId;
-  el.accessToken.value = state.accessToken;
-  el.voiceCloneAppId.value = state.voiceCloneAppId;
-  el.voiceCloneAccessToken.value = state.voiceCloneAccessToken;
+  el.ttsApiKey.value = state.ttsApiKey;
+
+  // 声音复刻配置初始化已移除
   el.testMode.checked = state.testMode;
 
   // 初始化内容卡片选择
@@ -984,7 +1079,7 @@ async function testCurrentVoiceSettings() {
       throw new Error('未找到音频数据');
     }
     
-    const audioBytes = base64ToBytes(audioBase64);
+    const audioBytes = safeBase64ToBytes(audioBase64);
     const mimeType = data.encoding ? (data.encoding === 'wav' ? 'audio/wav' : 'audio/mpeg') : detectAudioMimeType(audioBytes);
     const blob = new Blob([audioBytes], { type: mimeType });
     
@@ -1248,10 +1343,9 @@ document.addEventListener('keydown', (e) => {
 el.saveConfig.addEventListener('click', () => {
   state.textApiKey = el.textApiKey.value.trim();
   state.modelEndpoint = el.modelEndpoint.value.trim();
-  state.ttsAppId = el.ttsAppId.value.trim();
-  state.accessToken = el.accessToken.value.trim();
-  state.voiceCloneAppId = el.voiceCloneAppId.value.trim();
-  state.voiceCloneAccessToken = el.voiceCloneAccessToken.value.trim();
+  state.ttsApiKey = el.ttsApiKey.value.trim();
+
+  // 声音复刻配置已移除
   // 语音类型现在从voiceSelector获取
   state.voiceType = el.voiceSelector.value;
   state.testMode = el.testMode.checked;
@@ -1265,10 +1359,9 @@ el.saveConfig.addEventListener('click', () => {
   // 保存到localStorage
   storage.set('ve_text_api_key', state.textApiKey);
   storage.set('ve_model_endpoint', state.modelEndpoint);
-  storage.set('ve_tts_appid', state.ttsAppId);
-  storage.set('ve_access_token', state.accessToken);
-  storage.set('ve_voice_clone_appid', state.voiceCloneAppId);
-  storage.set('ve_voice_clone_access_token', state.voiceCloneAccessToken);
+  storage.set('ve_tts_api_key', state.ttsApiKey);
+
+  // 声音复刻存储已移除
   storage.set('ve_voice_type', state.voiceType);
   storage.set('ve_test_mode', state.testMode);
 
@@ -1321,15 +1414,18 @@ el.generateContent.addEventListener('click', async() => {
 
 // 试听功能
 async function previewContent() {
-  if (!state.lastContent) {
-    showError('请先生成文本内容');
+  // 获取当前文本内容，优先使用lastContent，否则使用输入框内容
+  const currentText = state.lastContent || el.contentText.textContent.trim();
+  
+  if (!currentText) {
+    showError('请先输入或生成文本内容');
     return;
   }
   
   setLoading(el.previewAudio, true);
   try {
     // 截取前10个字符作为试听内容
-    const previewText = state.lastContent.substring(0, 10);
+    const previewText = currentText.substring(0, 10);
     if (previewText.length < 5) {
       throw new Error('生成的内容太短，无法进行试听');
     }
@@ -1361,67 +1457,72 @@ async function previewContent() {
       await voiceCloneTTSSynthesize(payload) : 
       await ttsSynthesize(payload);
     
-    // API响应调试日志
-    console.log('📡 TTS API响应:', {
-      hasData: !!data,
-      dataKeys: data ? Object.keys(data) : [],
-      mode: data?.mode,
-      encoding: data?.encoding,
-      voice_type: data?.voice_type,
-      hasAudioData: !!(data?.data || data?.audio),
-      timestamp: new Date().toISOString()
-    });
-    
-    let audioBase64;
-    let blob;
-    
-    // 处理测试模式和生产模式的不同返回格式
-    if (state.testMode || (data.mode && data.mode === 'test')) {
-      if (data.data && typeof data.data === 'string') {
-        audioBase64 = data.data;
-      } else {
-        throw new Error('测试模式返回格式异常：未找到音频数据');
-      }
-      
-      const audioBytes = base64ToBytes(audioBase64);
-      const mimeType = data.encoding === 'wav' ? 'audio/wav' : 'audio/mpeg';
-      blob = new Blob([audioBytes], { type: mimeType });
-    } else {
-      if (data.data && typeof data.data === 'string') {
-        audioBase64 = data.data;
-      } else if (data.data && data.data.audio) {
-        audioBase64 = data.data.audio;
-      } else if (data.audio) {
-        audioBase64 = data.audio;
-      } else {
-        throw new Error('TTS返回格式异常：未找到音频数据');
-      }
-      
-      const audioBytes = base64ToBytes(audioBase64);
-      const mimeType = data.encoding ? (data.encoding === 'wav' ? 'audio/wav' : 'audio/mpeg') : detectAudioMimeType(audioBytes);
-      blob = new Blob([audioBytes], { type: mimeType });
+    // 使用新的音频处理逻辑
+    if (!data.audioBytes || !data.mimeType) {
+      throw new Error('TTS返回数据格式异常：缺少音频字节或MIME类型');
     }
     
     // 清理旧的试听音频URL
     if (state.lastPreviewUrl) {
-      URL.revokeObjectURL(state.lastPreviewUrl);
+      revokeAudioUrl(state.lastPreviewUrl);
+      state.lastPreviewUrl = null;
     }
     
-    const url = URL.createObjectURL(blob);
-    state.lastPreviewUrl = url;
+    // 使用工具函数创建音频URL
+    const audioUrl = buildAudioUrlFromBytes(data.audioBytes, data.mimeType);
+    state.lastPreviewUrl = audioUrl;
     
-    // 显示试听内容
-    el.previewText.textContent = `"${previewText}${state.lastContent.length > 10 ? '...' : ''}"`;
-    el.previewAudioElement.src = url;
-    el.previewPlayer.style.display = 'block';
+    // 获取音频元素
+    const audio = document.getElementById('previewAudioElement');
+    if (!audio) {
+      throw new Error('未找到音频播放元素');
+    }
     
-    // 添加错误处理
-    el.previewAudioElement.onerror = (e) => {
-      console.error('试听音频加载失败:', e);
-      showError('试听音频播放失败，请重试');
+    // 设置错误处理
+    audio.onerror = (e) => {
+      console.error('音频播放失败:', {
+        error: e,
+        src: audio.src,
+        mimeType: data.mimeType,
+        bytesLength: data.audioBytes.length
+      });
+      showError('音频播放失败，请重试');
     };
     
+    // 设置加载成功处理
+    audio.onloadeddata = () => {
+      console.info('音频加载成功:', {
+        duration: audio.duration,
+        src: audio.src.substring(0, 50) + '...',
+        mimeType: data.mimeType
+      });
+    };
+    
+    // 设置音频源并播放
+    audio.src = audioUrl;
+    await audio.load();
+    
+    // 显示试听内容
+    el.previewText.textContent = `"${previewText}${currentText.length > 10 ? '...' : ''}"`;    
+    el.previewPlayer.style.display = 'block';
+    
+    // 尝试播放（可能被浏览器阻止）
+    try {
+      await audio.play();
+    } catch (playError) {
+      console.warn('自动播放被阻止:', playError.message);
+      // 不抛出错误，用户可以手动点击播放
+    }
+    
     showSuccess('试听音频生成成功！请确认效果后生成完整语音');
+    
+    // 打印关键日志用于调试
+    console.info('TTS音频处理完成:', {
+      byteLength: data.audioBytes.length,
+      mime: data.mimeType,
+      source: data.source || 'unknown',
+      note: 'tts-preview'
+    });
     
   } catch (e) {
     console.error(e);
@@ -1535,8 +1636,8 @@ el.generateAudio.addEventListener('click', async() => {
         throw new Error('测试模式返回格式异常：未找到音频数据');
       }
       
-      const audioBytes = base64ToBytes(audioBase64);
-      const mimeType = data.encoding === 'wav' ? 'audio/wav' : 'audio/mpeg';
+      audioBytes = safeBase64ToBytes(audioBase64);
+      const mimeType = detectAudioMimeType(audioBytes, data.encoding);
       blob = new Blob([audioBytes], { type: mimeType });
       
       // 显示当前使用的语音类型
@@ -1555,8 +1656,8 @@ el.generateAudio.addEventListener('click', async() => {
         throw new Error('TTS返回格式异常：未找到音频数据');
       }
       
-      const audioBytes = base64ToBytes(audioBase64);
-      const mimeType = data.encoding ? (data.encoding === 'wav' ? 'audio/wav' : 'audio/mpeg') : detectAudioMimeType(audioBytes);
+      audioBytes = safeBase64ToBytes(audioBase64);
+      const mimeType = detectAudioMimeType(audioBytes, data.encoding);
       blob = new Blob([audioBytes], { type: mimeType });
       
       const voiceTypeName = getVoiceTypeName(state.voiceType);
@@ -1572,14 +1673,43 @@ el.generateAudio.addEventListener('click', async() => {
     const url = URL.createObjectURL(blob);
     state.lastAudioUrl = url;
     
-    // 添加错误处理
-    el.audioElement.onerror = (e) => {
-      console.error('音频加载失败:', e);
-      showError('音频播放失败，请重试');
+    // 添加错误处理（含 WAV 回退）
+    el.audioElement.__veTriedFallback = false;
+    el.audioElement.onerror = async (e) => {
+      console.error('音频加载失败:', {
+        error: e,
+        src: el.audioElement.src,
+        blobSize: blob ? blob.size : 'unknown',
+        blobType: blob ? blob.type : 'unknown'
+      });
+      if (el.audioElement.__veTriedFallback) {
+        showError('音频播放失败，请重试');
+        return;
+      }
+      el.audioElement.__veTriedFallback = true;
+      try {
+        const wavUrl = await decodeAudioBytesToWavUrl(audioBytes, blob);
+        if (state.lastAudioUrl) URL.revokeObjectURL(state.lastAudioUrl);
+        state.lastAudioUrl = wavUrl;
+        el.audioElement.src = wavUrl;
+        el.audioElement.load();
+        console.log('已回退为 WAV 播放:', { from: 'webaudio', type: 'audio/wav', src: wavUrl });
+      } catch (fallbackErr) {
+        console.error('WAV 回退失败:', fallbackErr);
+        showError('音频播放失败（解码回退失败）');
+      }
+    };
+    
+    el.audioElement.onloadeddata = () => {
+      console.log('主音频加载成功:', {
+        duration: el.audioElement.duration,
+        src: el.audioElement.src
+      });
     };
     
     el.audioElement.src = url;
     el.audioPlayer.style.display = 'flex';
+    el.audioElement.load();
   } catch (e) {
     console.error(e);
     alert('生成语音失败：' + (e.message || '请稍后重试'));
@@ -1784,6 +1914,105 @@ function audioBufferToWav(buffer) {
 
 
 
+// 将原始 PCM 数据转换为 WAV 格式
+function pcmToWav(pcmData, sampleRate = 24000, numChannels = 1, bitsPerSample = 16) {
+  const byteRate = sampleRate * numChannels * bitsPerSample / 8;
+  const blockAlign = numChannels * bitsPerSample / 8;
+  const dataSize = pcmData.length;
+  const fileSize = 36 + dataSize;
+  
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+  
+  // WAV 文件头
+  const writeString = (offset, string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  };
+  
+  writeString(0, 'RIFF');
+  view.setUint32(4, fileSize, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true); // fmt chunk size
+  view.setUint16(20, 1, true); // PCM format
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitsPerSample, true);
+  writeString(36, 'data');
+  view.setUint32(40, dataSize, true);
+  
+  // 复制 PCM 数据
+  const pcmView = new Uint8Array(buffer, 44);
+  pcmView.set(pcmData);
+  
+  return buffer;
+}
+
+// 附加：将原始音频字节或源 Blob 解码为 WAV，并返回可播放的 URL
+async function decodeAudioBytesToWavUrl(audioBytes, srcBlob) {
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) throw new Error('当前浏览器不支持WebAudio');
+
+  // 构造候选 ArrayBuffer：优先使用字节数据，其次使用源 Blob
+  const candidates = [];
+  if (audioBytes && audioBytes.buffer) {
+    try {
+      const abFromBytes = audioBytes.buffer.slice(
+        audioBytes.byteOffset,
+        audioBytes.byteOffset + audioBytes.byteLength
+      );
+      candidates.push(abFromBytes);
+    } catch (e) {
+      console.warn('从字节获取ArrayBuffer失败', e);
+    }
+  }
+  if (srcBlob && typeof srcBlob.arrayBuffer === 'function') {
+    try {
+      const abFromBlob = await srcBlob.arrayBuffer();
+      candidates.push(abFromBlob);
+    } catch (e) {
+      console.warn('从Blob读取ArrayBuffer失败', e);
+    }
+  }
+  if (candidates.length === 0) {
+    throw new Error('没有可用的音频数据用于解码');
+  }
+
+  let lastErr;
+  for (const ab of candidates) {
+    const ctx = new AudioCtx();
+    try {
+      if (ctx.state === 'suspended') {
+        try { await ctx.resume(); } catch {}
+      }
+      const decoded = await new Promise((resolve, reject) => {
+        try {
+          const maybePromise = ctx.decodeAudioData(ab, resolve, reject);
+          if (maybePromise && typeof maybePromise.then === 'function') {
+            maybePromise.then(resolve).catch(reject);
+          }
+        } catch (err) {
+          reject(err);
+        }
+      });
+      const wavBuffer = audioBufferToWav(decoded);
+      const wavBlob = new Blob([wavBuffer], { type: 'audio/wav' });
+      const wavUrl = URL.createObjectURL(wavBlob);
+      try { await ctx.close(); } catch {}
+      return wavUrl;
+    } catch (err) {
+      lastErr = err;
+      try { await ctx.close(); } catch {}
+      continue;
+    }
+  }
+  throw lastErr || new Error('音频解码失败');
+}
+
 function base64ToBytes(base64) {
   const binary_string = atob(base64);
   const len = binary_string.length;
@@ -1794,41 +2023,95 @@ function base64ToBytes(base64) {
   return bytes;
 }
 
+// 新增：规范化并安全解码 Base64，处理 URL-safe 与缺失的 padding
+function normalizeBase64(str) {
+  if (!str) return '';
+  const idx = str.indexOf('base64,');
+  if (idx !== -1) {
+    str = str.slice(idx + 7);
+  }
+  str = str.trim().replace(/[\r\n\s]/g, '');
+  // URL-safe 转标准
+  str = str.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = str.length % 4;
+  if (pad) {
+    str += '='.repeat(4 - pad);
+  }
+  return str;
+}
+
+function safeBase64ToBytes(b64) {
+  const normalized = normalizeBase64(b64);
+  try {
+    return base64ToBytes(normalized);
+  } catch (err) {
+    console.error('Base64解码失败', err, { length: b64 ? b64.length : 0 });
+    throw new Error('音频数据解码失败，请稍后重试');
+  }
+}
+
 // 检测音频数据的MIME类型
-function detectAudioMimeType(audioBytes) {
+function detectAudioMimeType(audioBytes, serverEncoding = null) {
+  // 优先使用服务器返回的编码信息
+  if (serverEncoding) {
+    const encodingMap = {
+      'wav': 'audio/wav',
+      'mp3': 'audio/mpeg', 
+      'mpeg': 'audio/mpeg',
+      'ogg': 'audio/ogg',
+      'opus': 'audio/ogg',
+      'mp4': 'audio/mp4',
+      'aac': 'audio/mp4',
+      'pcm': 'audio/wav'  // PCM数据应该已转换为WAV
+    };
+    const mimeType = encodingMap[serverEncoding.toLowerCase()];
+    if (mimeType) {
+      console.log(`使用服务器指定的音频格式: ${serverEncoding} -> ${mimeType}`);
+      return mimeType;
+    }
+  }
+
   if (!audioBytes || audioBytes.length < 12) {
-    return 'audio/mpeg'; // 默认回退
+    console.warn('音频数据太小，默认使用WAV格式');
+    return 'audio/wav';
   }
 
-  // MP3 文件检测（帧同步或 ID3 头）
-  if (audioBytes[0] === 0xFF && (audioBytes[1] & 0xE0) === 0xE0) {
-    return 'audio/mpeg';
-  }
-  if (audioBytes[0] === 0x49 && audioBytes[1] === 0x44 && audioBytes[2] === 0x33) {
-    return 'audio/mpeg'; // ID3 tagged MP3
-  }
-
-  // WAV 文件检测 RIFF....WAVE
+  // WAV 文件检测 RIFF....WAVE（优先检测，因为后端会转换PCM为WAV）
   if (audioBytes[0] === 0x52 && audioBytes[1] === 0x49 &&
       audioBytes[2] === 0x46 && audioBytes[3] === 0x46 &&
       audioBytes[8] === 0x57 && audioBytes[9] === 0x41 &&
       audioBytes[10] === 0x56 && audioBytes[11] === 0x45) {
+    console.log('检测到WAV格式音频');
     return 'audio/wav';
+  }
+
+  // MP3 文件检测（帧同步或 ID3 头）
+  if (audioBytes[0] === 0xFF && (audioBytes[1] & 0xE0) === 0xE0) {
+    console.log('检测到MP3格式音频（帧同步）');
+    return 'audio/mpeg';
+  }
+  if (audioBytes[0] === 0x49 && audioBytes[1] === 0x44 && audioBytes[2] === 0x33) {
+    console.log('检测到MP3格式音频（ID3标签）');
+    return 'audio/mpeg';
   }
 
   // OGG 文件检测 OggS
   if (audioBytes[0] === 0x4F && audioBytes[1] === 0x67 &&
       audioBytes[2] === 0x67 && audioBytes[3] === 0x53) {
+    console.log('检测到OGG格式音频');
     return 'audio/ogg';
   }
 
   // M4A/AAC/MP4 容器 ftyp
   if (audioBytes[4] === 0x66 && audioBytes[5] === 0x74 &&
       audioBytes[6] === 0x79 && audioBytes[7] === 0x70) {
+    console.log('检测到MP4格式音频');
     return 'audio/mp4';
   }
 
-  return 'audio/mpeg'; // 默认回退
+  // 如果没有识别到特定格式头，默认为WAV
+  console.warn('无法识别音频格式，默认使用WAV');
+  return 'audio/wav';
 }
 
 // 声音复刻功能相关变量
@@ -1862,9 +2145,10 @@ async function voiceCloneAPI(action, data = {}) {
     const headers = {
       'Content-Type': 'application/json'
     };
-    // 添加认证头（如果配置了API密钥）
-    if (state.textApiKey) {
-      headers['X-Auth-Token'] = state.textApiKey;
+    // 复刻与 TTS 接口共享同一鉴权，优先使用 ttsApiKey
+    const authToken = state.ttsApiKey || state.textApiKey;
+    if (authToken) {
+      headers['X-Auth-Token'] = authToken;
     }
 
     const payload = {
@@ -1875,7 +2159,8 @@ async function voiceCloneAPI(action, data = {}) {
     const response = await fetch(`${API_BASE}/api/voice_clone`, {
       method: 'POST',
       headers: headers,
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      cache: 'no-store' // 明确禁用缓存
     });
 
     const result = await response.json();
@@ -1899,10 +2184,14 @@ async function voiceCloneAPI(action, data = {}) {
 async function getClonedVoices() {
   try {
     const headers = {};
-    if (state.textApiKey) {
-      headers['X-Auth-Token'] = state.textApiKey;
+    const authToken = state.ttsApiKey || state.textApiKey;
+    if (authToken) {
+      headers['X-Auth-Token'] = authToken;
     }
-    const response = await fetch(`${API_BASE}/api/voice_clone?action=list`, { headers });
+    const response = await fetch(`${API_BASE}/api/voice_clone?action=list`, { 
+      headers,
+      cache: 'no-store' // 明确禁用缓存
+    });
     const data = await response.json();
     
     if (!response.ok) {
@@ -1920,10 +2209,14 @@ async function getClonedVoices() {
 async function getTrainingStatus(speakerId) {
   try {
     const headers = {};
-    if (state.textApiKey) {
-      headers['X-Auth-Token'] = state.textApiKey;
+    const authToken = state.ttsApiKey || state.textApiKey;
+    if (authToken) {
+      headers['X-Auth-Token'] = authToken;
     }
-    const response = await fetch(`${API_BASE}/api/voice_clone?action=status&speaker_id=${speakerId}`, { headers });
+    const response = await fetch(`${API_BASE}/api/voice_clone?action=status&speaker_id=${speakerId}`, { 
+      headers,
+      cache: 'no-store' // 明确禁用缓存
+    });
     const data = await response.json();
     
     if (!response.ok) {
@@ -2213,100 +2506,35 @@ function useClonedVoice(speakerId, voiceName) {
   showSuccess(`已切换到声音: ${voiceName}`);
 }
 
-// 声音复刻专用TTS函数
+// 声音复刻专用TTS函数（简化版，直接使用统一的TTS接口）
 async function voiceCloneTTSSynthesize(payload) {
   try {
     // 检查是否为复刻声音
     const isClonedVoice = payload.voice_type && !payload.voice_type.startsWith('zh_');
     
-    if (!isClonedVoice) {
-      // 如果不是复刻声音，使用普通TTS API
-      console.log('使用普通TTS API处理非复刻声音:', payload.voice_type);
-      return await ttsSynthesize(payload);
-    }
-    
-    // 检查是否配置了声音复刻API
-    if (!state.voiceCloneAppId || !state.voiceCloneAccessToken) {
-      const errorMsg = '声音复刻功能未配置';
-      const suggestion = '请点击页面右上角的设置按钮，配置火山引擎的AppID和Access Token';
-      showError(errorMsg, { 
-        showRetry: false,
-        suggestion: suggestion
-      });
-      throw new Error(`${errorMsg}。${suggestion}`);
-    }
-    
-    // 验证配置格式
-    if (state.voiceCloneAppId.length < 10) {
-      throw new Error('AppID格式不正确，请检查配置');
-    }
-    
-    if (state.voiceCloneAccessToken.length < 20) {
-      throw new Error('Access Token格式不正确，请检查配置');
-    }
-    
-    console.log('使用声音复刻API:', {
+    console.log('调用TTS接口:', {
       voice_type: payload.voice_type,
-      app_id: state.voiceCloneAppId ? '已配置' : '未配置',
-      access_token: state.voiceCloneAccessToken ? '已配置' : '未配置'
+      is_cloned: isClonedVoice,
+      text_length: payload.text ? payload.text.length : 0
     });
     
-    // 使用声音复刻专用配置
-    const headers = {
-      'Content-Type': 'application/json'
-    };
-    // 添加认证头（如果配置了API密钥）
-    if (state.textApiKey) {
-      headers['X-Auth-Token'] = state.textApiKey;
-    }
+    // 直接使用统一的TTS接口，后端会根据voice_type自动判断处理方式
+    return await ttsSynthesize(payload);
     
-    // 修改payload以使用声音复刻配置
-    const voiceClonePayload = {
-      ...payload,
-      app_id: state.voiceCloneAppId,
-      access_token: state.voiceCloneAccessToken
-    };
-    
-    // 根据文本长度调整超时时间
-    const textLength = payload.text ? payload.text.length : 0;
-    const baseTimeout = 30000; // 基础30秒
-    const timeoutPerChar = 50; // 每个字符增加50ms
-    const timeout = Math.min(baseTimeout + (textLength * timeoutPerChar), 120000); // 最大2分钟
-    
-    console.log(`声音复刻TTS - 文本长度: ${textLength}, 超时设置: ${timeout/1000}秒`);
-    
-    const response = await fetchWithTimeoutAndRetry(`${API_BASE}/api/tts`, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(voiceClonePayload)
-    }, timeout);
-    
-    const data = await response.json();
-    
-    if (!response.ok) {
-      const errorMsg = data.error || `HTTP ${response.status}`;
-      console.error('声音复刻API响应错误:', errorMsg);
-      throw new Error(`声音复刻失败: ${errorMsg}`);
-    }
-    
-    if (data.error) {
-      console.error('声音复刻返回错误:', data.error);
-      throw new Error(`声音复刻失败: ${data.error}`);
-    }
-    
-    console.log('声音复刻TTS成功');
-    return data;
   } catch (error) {
     console.error('声音复刻TTS失败:', error);
+    
     // 提供更友好的错误信息
     if (error.message.includes('timeout')) {
-      throw new Error('声音复刻请求超时，请稍后重试');
+      throw new Error('请求超时，请稍后重试');
     } else if (error.message.includes('network')) {
       throw new Error('网络连接失败，请检查网络设置');
-    } else if (error.message.includes('未配置')) {
-      throw error; // 保持配置错误的原始信息
+    } else if (error.message.includes('403')) {
+      throw new Error('访问被拒绝，请检查API配置或声音ID是否正确');
+    } else if (error.message.includes('409')) {
+      throw new Error('声音尚未训练完成，请等待训练完成后再试');
     } else {
-      throw new Error(`声音复刻失败: ${error.message}`);
+      throw new Error(`语音合成失败: ${error.message}`);
     }
   }
 }
@@ -2347,7 +2575,7 @@ async function testVoicePreview(speakerId, voiceName) {
       throw new Error('未找到音频数据');
     }
     
-    const audioBytes = base64ToBytes(audioBase64);
+    const audioBytes = safeBase64ToBytes(audioBase64);
     const mimeType = data.encoding ? (data.encoding === 'wav' ? 'audio/wav' : 'audio/mpeg') : detectAudioMimeType(audioBytes);
     const blob = new Blob([audioBytes], { type: mimeType });
     
@@ -2595,9 +2823,9 @@ async function generateAudioForHistoryItem(text) {
       throw new Error('TTS返回格式异常：未找到音频数据');
     }
 
-    const audioBytes = base64ToBytes(audioBase64);
+    const audioBytes = safeBase64ToBytes(audioBase64);
     // Determine correct MIME type from bytes or response info
-    const mimeType = data.encoding ? (data.encoding === 'wav' ? 'audio/wav' : 'audio/mpeg') : detectAudioMimeType(audioBytes);
+    const mimeType = detectAudioMimeType(audioBytes, data.encoding);
     const blob = new Blob([audioBytes], { type: mimeType });
     
     // 清理旧的blob URL
@@ -2609,14 +2837,43 @@ async function generateAudioForHistoryItem(text) {
     const url = URL.createObjectURL(blob);
     state.lastAudioUrl = url;
     
-    // 添加错误处理
-    el.audioElement.onerror = (e) => {
-      console.error('音频加载失败:', e);
-      showError('音频播放失败，请重试');
+    // 添加错误处理（含 WAV 回退）
+    el.audioElement.__veTriedFallback = false;
+    el.audioElement.onerror = async (e) => {
+      console.error('音频加载失败:', {
+        error: e,
+        src: el.audioElement.src,
+        blobSize: blob ? blob.size : 'unknown',
+        blobType: blob ? blob.type : 'unknown'
+      });
+      if (el.audioElement.__veTriedFallback) {
+        showError('音频播放失败，请重试');
+        return;
+      }
+      el.audioElement.__veTriedFallback = true;
+      try {
+        const wavUrl = await decodeAudioBytesToWavUrl(audioBytes, blob);
+        if (state.lastAudioUrl) URL.revokeObjectURL(state.lastAudioUrl);
+        state.lastAudioUrl = wavUrl;
+        el.audioElement.src = wavUrl;
+        el.audioElement.load();
+        console.log('已回退为 WAV 播放:', { from: 'webaudio', type: 'audio/wav', src: wavUrl });
+      } catch (fallbackErr) {
+        console.error('WAV 回退失败:', fallbackErr);
+        showError('音频播放失败（解码回退失败）');
+      }
+    };
+    
+    el.audioElement.onloadeddata = () => {
+      console.log('历史音频加载成功:', {
+        duration: el.audioElement.duration,
+        src: el.audioElement.src
+      });
     };
     
     el.audioElement.src = url;
     el.audioPlayer.style.display = 'flex';
+    el.audioElement.load();
 
     // 将历史记录的文本设置为当前内容
     state.lastContent = text;

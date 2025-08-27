@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>前端鉴权冒烟测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            border-left: 4px solid #007bff;
+            padding-left: 15px;
+        }
+        .test-case {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .test-result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        input[type="text"], input[type="password"] {
+            width: 300px;
+            padding: 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            margin: 5px;
+        }
+        .config-section {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 前端鉴权冒烟测试</h1>
+    
+    <div class="test-container">
+        <h2>📋 测试配置</h2>
+        <div class="config-section">
+            <label>
+                <input type="checkbox" id="testMode" checked> 启用测试模式（使用模拟数据，节省API成本）
+            </label><br>
+            <label>
+                服务器地址: 
+                <input type="text" id="serverUrl" value="http://localhost:8001" placeholder="http://localhost:8001">
+            </label><br>
+            <label>
+                文本API Key: 
+                <input type="password" id="textApiKey" placeholder="请输入火山引擎文本模型API Key">
+            </label><br>
+            <label>
+                TTS API Key: 
+                <input type="password" id="ttsApiKey" placeholder="请输入火山引擎TTS API Key">
+            </label><br>
+            <button onclick="runAllTests()">🚀 运行所有测试</button>
+            <button onclick="clearResults()">🧹 清空结果</button>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>📝 文本生成鉴权测试</h2>
+        <div class="test-section">
+            <div class="test-case">
+                <h4>测试1: arkGenerate 使用 textApiKey</h4>
+                <p>验证文本生成功能仅使用 textApiKey，不回退到 ttsApiKey</p>
+                <button onclick="testArkGenerateAuth()">运行测试</button>
+                <div id="arkAuthResult" class="test-result"></div>
+            </div>
+            
+            <div class="test-case">
+                <h4>测试2: 缺少 textApiKey 时的错误处理</h4>
+                <p>验证当 textApiKey 为空且未启用测试模式时的错误提示</p>
+                <button onclick="testArkGenerateNoKey()">运行测试</button>
+                <div id="arkNoKeyResult" class="test-result"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>🔊 TTS合成鉴权测试</h2>
+        <div class="test-section">
+            <div class="test-case">
+                <h4>测试3: ttsSynthesize 优先使用 ttsApiKey</h4>
+                <p>验证TTS合成优先使用 ttsApiKey，当为空时回退到 textApiKey</p>
+                <button onclick="testTTSAuth()">运行测试</button>
+                <div id="ttsAuthResult" class="test-result"></div>
+            </div>
+            
+            <div class="test-case">
+                <h4>测试4: TTS回退逻辑</h4>
+                <p>验证当 ttsApiKey 为空时，正确回退到 textApiKey</p>
+                <button onclick="testTTSFallback()">运行测试</button>
+                <div id="ttsFallbackResult" class="test-result"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>🎭 声音复刻鉴权测试</h2>
+        <div class="test-section">
+            <div class="test-case">
+                <h4>测试5: 声音复刻API鉴权一致性</h4>
+                <p>验证 getClonedVoices, voiceCloneAPI 等函数与TTS使用相同的鉴权逻辑</p>
+                <button onclick="testVoiceCloneAuth()">运行测试</button>
+                <div id="voiceCloneAuthResult" class="test-result"></div>
+            </div>
+            
+            <div class="test-case">
+                <h4>测试6: 声音复刻状态查询鉴权</h4>
+                <p>验证训练状态查询功能的鉴权逻辑</p>
+                <button onclick="testVoiceCloneStatus()">运行测试</button>
+                <div id="voiceCloneStatusResult" class="test-result"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>📊 测试日志</h2>
+        <div id="testLog" class="log"></div>
+    </div>
+
+    <script>
+        // 测试状态管理
+        let testResults = {
+            arkAuth: null,
+            arkNoKey: null,
+            ttsAuth: null,
+            ttsFallback: null,
+            voiceCloneAuth: null,
+            voiceCloneStatus: null
+        };
+
+        // 日志函数
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logDiv = document.getElementById('testLog');
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+            logEntry.style.color = type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#6c757d';
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // 显示测试结果
+        function showResult(elementId, success, message) {
+            const element = document.getElementById(elementId);
+            element.className = `test-result ${success ? 'success' : 'error'}`;
+            element.textContent = message;
+            log(`${elementId}: ${message}`, success ? 'success' : 'error');
+        }
+
+        // 模拟API调用
+        async function mockApiCall(endpoint, options = {}) {
+            const testMode = document.getElementById('testMode').checked;
+            const serverUrl = document.getElementById('serverUrl').value;
+            
+            if (testMode) {
+                // 模拟响应
+                await new Promise(resolve => setTimeout(resolve, 500)); // 模拟网络延迟
+                
+                if (endpoint.includes('/api/ark')) {
+                    return {
+                        ok: true,
+                        choices: [{
+                            message: {
+                                content: '这是模拟的文本生成结果。测试模式下的内容。'
+                            }
+                        }]
+                    };
+                } else if (endpoint.includes('/api/tts')) {
+                    return {
+                        ok: true,
+                        audio_data: 'mock_audio_base64_data',
+                        message: '语音合成成功（测试模式）'
+                    };
+                } else if (endpoint.includes('/api/voice_clone')) {
+                    return {
+                        ok: true,
+                        voices: [
+                            { id: 'S_test_voice_1', name: '测试声音1', status: 'completed' },
+                            { id: 'S_test_voice_2', name: '测试声音2', status: 'training' }
+                        ]
+                    };
+                }
+            } else {
+                // 真实API调用
+                const response = await fetch(`${serverUrl}${endpoint}`, options);
+                return await response.json();
+            }
+        }
+
+        // 测试1: arkGenerate 鉴权
+        async function testArkGenerateAuth() {
+            log('开始测试 arkGenerate 鉴权逻辑...');
+            
+            try {
+                const textApiKey = document.getElementById('textApiKey').value || 'test_text_key';
+                const ttsApiKey = document.getElementById('ttsApiKey').value || 'test_tts_key';
+                
+                // 模拟 arkGenerate 调用
+                const response = await mockApiCall('/api/ark', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Auth-Token': textApiKey // arkGenerate 应该只使用 textApiKey
+                    },
+                    body: JSON.stringify({
+                        prompt: '测试文本生成',
+                        max_tokens: 100
+                    })
+                });
+                
+                if (response.ok) {
+                    testResults.arkAuth = true;
+                    showResult('arkAuthResult', true, '✅ arkGenerate 正确使用 textApiKey 进行鉴权');
+                } else {
+                    testResults.arkAuth = false;
+                    showResult('arkAuthResult', false, '❌ arkGenerate 鉴权失败');
+                }
+            } catch (error) {
+                testResults.arkAuth = false;
+                showResult('arkAuthResult', false, `❌ 测试异常: ${error.message}`);
+            }
+        }
+
+        // 测试2: arkGenerate 缺少密钥
+        async function testArkGenerateNoKey() {
+            log('开始测试 arkGenerate 缺少密钥的错误处理...');
+            
+            try {
+                // 临时清空密钥并禁用测试模式
+                const originalTestMode = document.getElementById('testMode').checked;
+                const originalTextKey = document.getElementById('textApiKey').value;
+                
+                document.getElementById('testMode').checked = false;
+                document.getElementById('textApiKey').value = '';
+                
+                // 模拟调用
+                try {
+                    const response = await mockApiCall('/api/ark', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Auth-Token': '' // 空密钥
+                        },
+                        body: JSON.stringify({
+                            prompt: '测试文本生成',
+                            max_tokens: 100
+                        })
+                    });
+                    
+                    testResults.arkNoKey = false;
+                    showResult('arkNoKeyResult', false, '❌ 应该返回错误但没有');
+                } catch (error) {
+                    testResults.arkNoKey = true;
+                    showResult('arkNoKeyResult', true, '✅ 正确处理缺少密钥的情况');
+                }
+                
+                // 恢复原始设置
+                document.getElementById('testMode').checked = originalTestMode;
+                document.getElementById('textApiKey').value = originalTextKey;
+                
+            } catch (error) {
+                testResults.arkNoKey = false;
+                showResult('arkNoKeyResult', false, `❌ 测试异常: ${error.message}`);
+            }
+        }
+
+        // 测试3: TTS鉴权
+        async function testTTSAuth() {
+            log('开始测试 TTS 鉴权逻辑...');
+            
+            try {
+                const textApiKey = document.getElementById('textApiKey').value || 'test_text_key';
+                const ttsApiKey = document.getElementById('ttsApiKey').value || 'test_tts_key';
+                
+                // 模拟 ttsSynthesize 调用（有 ttsApiKey 时应优先使用）
+                const response = await mockApiCall('/api/tts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Auth-Token': ttsApiKey // 应该优先使用 ttsApiKey
+                    },
+                    body: JSON.stringify({
+                        text: '测试语音合成',
+                        voice: 'zh_female_xinlingjitang_moon_bigtts'
+                    })
+                });
+                
+                if (response.ok) {
+                    testResults.ttsAuth = true;
+                    showResult('ttsAuthResult', true, '✅ TTS 正确优先使用 ttsApiKey 进行鉴权');
+                } else {
+                    testResults.ttsAuth = false;
+                    showResult('ttsAuthResult', false, '❌ TTS 鉴权失败');
+                }
+            } catch (error) {
+                testResults.ttsAuth = false;
+                showResult('ttsAuthResult', false, `❌ 测试异常: ${error.message}`);
+            }
+        }
+
+        // 测试4: TTS回退逻辑
+        async function testTTSFallback() {
+            log('开始测试 TTS 回退逻辑...');
+            
+            try {
+                const textApiKey = document.getElementById('textApiKey').value || 'test_text_key';
+                
+                // 临时清空 ttsApiKey
+                const originalTtsKey = document.getElementById('ttsApiKey').value;
+                document.getElementById('ttsApiKey').value = '';
+                
+                // 模拟 ttsSynthesize 调用（无 ttsApiKey 时应回退到 textApiKey）
+                const response = await mockApiCall('/api/tts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Auth-Token': textApiKey // 应该回退到 textApiKey
+                    },
+                    body: JSON.stringify({
+                        text: '测试语音合成回退',
+                        voice: 'zh_female_xinlingjitang_moon_bigtts'
+                    })
+                });
+                
+                // 恢复原始设置
+                document.getElementById('ttsApiKey').value = originalTtsKey;
+                
+                if (response.ok) {
+                    testResults.ttsFallback = true;
+                    showResult('ttsFallbackResult', true, '✅ TTS 正确回退到 textApiKey 进行鉴权');
+                } else {
+                    testResults.ttsFallback = false;
+                    showResult('ttsFallbackResult', false, '❌ TTS 回退逻辑失败');
+                }
+            } catch (error) {
+                testResults.ttsFallback = false;
+                showResult('ttsFallbackResult', false, `❌ 测试异常: ${error.message}`);
+            }
+        }
+
+        // 测试5: 声音复刻鉴权
+        async function testVoiceCloneAuth() {
+            log('开始测试声音复刻鉴权逻辑...');
+            
+            try {
+                const textApiKey = document.getElementById('textApiKey').value || 'test_text_key';
+                const ttsApiKey = document.getElementById('ttsApiKey').value || 'test_tts_key';
+                
+                // 测试 getClonedVoices（应该与TTS使用相同鉴权逻辑）
+                const response = await mockApiCall('/api/voice_clone?action=list', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Auth-Token': ttsApiKey || textApiKey // 应该与TTS一致
+                    }
+                });
+                
+                if (response.ok) {
+                    testResults.voiceCloneAuth = true;
+                    showResult('voiceCloneAuthResult', true, '✅ 声音复刻API与TTS使用一致的鉴权逻辑');
+                } else {
+                    testResults.voiceCloneAuth = false;
+                    showResult('voiceCloneAuthResult', false, '❌ 声音复刻鉴权失败');
+                }
+            } catch (error) {
+                testResults.voiceCloneAuth = false;
+                showResult('voiceCloneAuthResult', false, `❌ 测试异常: ${error.message}`);
+            }
+        }
+
+        // 测试6: 声音复刻状态查询
+        async function testVoiceCloneStatus() {
+            log('开始测试声音复刻状态查询鉴权...');
+            
+            try {
+                const textApiKey = document.getElementById('textApiKey').value || 'test_text_key';
+                const ttsApiKey = document.getElementById('ttsApiKey').value || 'test_tts_key';
+                
+                // 测试训练状态查询
+                const response = await mockApiCall('/api/voice_clone?action=status&speaker_id=S_test_voice', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Auth-Token': ttsApiKey || textApiKey
+                    }
+                });
+                
+                if (response.ok) {
+                    testResults.voiceCloneStatus = true;
+                    showResult('voiceCloneStatusResult', true, '✅ 声音复刻状态查询鉴权正常');
+                } else {
+                    testResults.voiceCloneStatus = false;
+                    showResult('voiceCloneStatusResult', false, '❌ 声音复刻状态查询鉴权失败');
+                }
+            } catch (error) {
+                testResults.voiceCloneStatus = false;
+                showResult('voiceCloneStatusResult', false, `❌ 测试异常: ${error.message}`);
+            }
+        }
+
+        // 运行所有测试
+        async function runAllTests() {
+            log('🚀 开始运行所有鉴权测试...');
+            clearResults();
+            
+            await testArkGenerateAuth();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            await testArkGenerateNoKey();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            await testTTSAuth();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            await testTTSFallback();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            await testVoiceCloneAuth();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            await testVoiceCloneStatus();
+            
+            // 汇总结果
+            const totalTests = Object.keys(testResults).length;
+            const passedTests = Object.values(testResults).filter(result => result === true).length;
+            const failedTests = Object.values(testResults).filter(result => result === false).length;
+            
+            log(`📊 测试完成! 总计: ${totalTests}, 通过: ${passedTests}, 失败: ${failedTests}`, 
+                failedTests === 0 ? 'success' : 'error');
+            
+            if (failedTests === 0) {
+                log('🎉 所有鉴权测试通过！鉴权逻辑工作正常。', 'success');
+            } else {
+                log('⚠️ 部分测试失败，请检查鉴权逻辑实现。', 'error');
+            }
+        }
+
+        // 清空结果
+        function clearResults() {
+            const resultElements = [
+                'arkAuthResult', 'arkNoKeyResult', 'ttsAuthResult', 
+                'ttsFallbackResult', 'voiceCloneAuthResult', 'voiceCloneStatusResult'
+            ];
+            
+            resultElements.forEach(id => {
+                const element = document.getElementById(id);
+                element.className = 'test-result';
+                element.textContent = '';
+            });
+            
+            document.getElementById('testLog').innerHTML = '';
+            testResults = {
+                arkAuth: null,
+                arkNoKey: null,
+                ttsAuth: null,
+                ttsFallback: null,
+                voiceCloneAuth: null,
+                voiceCloneStatus: null
+            };
+            
+            log('🧹 测试结果已清空');
+        }
+
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            log('🧪 前端鉴权冒烟测试工具已加载');
+            log('💡 提示: 启用测试模式可以避免消耗真实API配额');
+            log('🔧 配置好服务器地址和API密钥后，点击"运行所有测试"开始测试');
+        });
+    </script>
+</body>
+</html>

@@ -35,7 +35,7 @@ def _get_cors_headers(request_id=None, from_cache=None, cost_estimated=None, mod
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": allowed_origin,
         "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, X-Auth-Token, X-Mode, X-Dry-Run, X-Max-Daily-Cost",
+        "Access-Control-Allow-Headers": "Content-Type, X-Auth-Token, X-Mode, X-Dry-Run, X-Max-Daily-Cost, X-Api-Resource-Id",
     }
     
     # 添加自定义响应头
@@ -175,7 +175,7 @@ class handler(BaseHTTPRequestHandler):
             
             # 提取参数
             prompt = data.get("prompt", "").strip()
-            model = data.get("model") or os.environ.get('ARK_MODEL', 'kimi-k2-250711')
+            model = data.get("model") or os.environ.get('ARK_MODEL', 'doubao-seed-1-6-flash-250715')
             dry_run_param = data.get("dry_run", False)
             
             # 检查是否为干跑模式

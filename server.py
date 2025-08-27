@@ -141,10 +141,13 @@ class APIHandler(SimpleHTTPRequestHandler):
             # 处理静态文件请求
             # 如果访问根路径，重定向到 index.html
             if parsed_path.path == '/' or parsed_path.path == '':
-                self.path = '/public/index.html'
+                self.path = 'public/index.html'
             elif not parsed_path.path.startswith('/public/'):
                 # 其他路径也重定向到 public 目录
-                self.path = '/public' + parsed_path.path
+                self.path = 'public' + parsed_path.path
+            else:
+                # 如果已经是/public/开头，去掉开头的斜杠
+                self.path = parsed_path.path[1:]
             
             super().do_GET()
     

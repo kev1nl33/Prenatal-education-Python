@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTS音频播放测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        input[type="text"]:focus, textarea:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        .button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-right: 10px;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .audio-container {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 2px dashed #dee2e6;
+        }
+        audio {
+            width: 100%;
+            margin-top: 10px;
+        }
+        .log-container {
+            margin-top: 20px;
+            padding: 15px;
+            background: #1e1e1e;
+            color: #00ff00;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 TTS音频播放测试</h1>
+        
+        <div class="form-group">
+            <label for="testText">测试文本：</label>
+            <textarea id="testText" placeholder="输入要转换为语音的文本...">亲爱的宝贝，我在这儿。</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="apiKey">API密钥（可选）：</label>
+            <input type="text" id="apiKey" placeholder="输入TTS API密钥，留空使用测试模式">
+        </div>
+        
+        <div class="form-group">
+            <button id="testTtsBtn" class="button">🎤 请求 TTS 并播放</button>
+            <button id="clearLogBtn" class="button" style="background: #6c757d;">🗑️ 清空日志</button>
+        </div>
+        
+        <div class="audio-container">
+            <label>音频播放器：</label>
+            <audio id="previewAudioElement" controls>
+                您的浏览器不支持音频播放。
+            </audio>
+            <div id="audioStatus" class="status hidden"></div>
+        </div>
+        
+        <div class="log-container" id="logContainer">
+            <div>📋 控制台日志将在这里显示...</div>
+        </div>
+    </div>
+
+    <!-- 引入音频处理工具 -->
+    <script src="utils/audio.js"></script>
+    
+    <script>
+        // 日志显示功能
+        const logContainer = document.getElementById('logContainer');
+        const originalConsole = {
+            log: console.log,
+            info: console.info,
+            warn: console.warn,
+            error: console.error
+        };
+        
+        function addLogEntry(level, ...args) {
+            const timestamp = new Date().toLocaleTimeString();
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' ');
+            
+            const logEntry = document.createElement('div');
+            logEntry.style.marginBottom = '5px';
+            logEntry.style.color = {
+                'log': '#00ff00',
+                'info': '#00bfff',
+                'warn': '#ffff00',
+                'error': '#ff4444'
+            }[level] || '#00ff00';
+            
+            logEntry.textContent = `[${timestamp}] ${level.toUpperCase()}: ${message}`;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            
+            // 调用原始console方法
+            originalConsole[level](...args);
+        }
+        
+        // 重写console方法
+        console.log = (...args) => addLogEntry('log', ...args);
+        console.info = (...args) => addLogEntry('info', ...args);
+        console.warn = (...args) => addLogEntry('warn', ...args);
+        console.error = (...args) => addLogEntry('error', ...args);
+        
+        // 状态显示功能
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('audioStatus');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.classList.remove('hidden');
+            
+            if (type === 'success' || type === 'error') {
+                setTimeout(() => {
+                    statusEl.classList.add('hidden');
+                }, 5000);
+            }
+        }
+        
+        // TTS测试功能
+        async function testTtsAudio() {
+            const testText = document.getElementById('testText').value.trim();
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const testBtn = document.getElementById('testTtsBtn');
+            const audio = document.getElementById('previewAudioElement');
+            
+            if (!testText) {
+                showStatus('请输入测试文本', 'error');
+                return;
+            }
+            
+            testBtn.disabled = true;
+            testBtn.textContent = '🔄 处理中...';
+            showStatus('正在请求TTS服务...', 'info');
+            
+            try {
+                console.info('开始TTS测试:', {
+                    textLength: testText.length,
+                    hasApiKey: !!apiKey,
+                    timestamp: new Date().toISOString()
+                });
+                
+                // 构建请求
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                
+                if (apiKey) {
+                    headers['X-Auth-Token'] = apiKey;
+                }
+                
+                const payload = {
+                    text: testText,
+                    voice_type: 'zh_female_roumeinvyou_emo_v2_mars_bigtts',
+                    emotion: 'neutral',
+                    quality: 'draft'
+                };
+                
+                console.info('发送TTS请求:', { payload, headers: Object.keys(headers) });
+                
+                // 发起请求
+                const response = await fetch('/api/tts', {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(payload)
+                });
+                
+                // 读取响应头
+                const contentType = response.headers.get('content-type') || '';
+                console.info('TTS响应Content-Type:', contentType);
+                
+                if (!response.ok) {
+                    let errorMessage = `HTTP ${response.status}`;
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.error || errorMessage;
+                    } catch (e) {
+                        // 无法解析JSON错误
+                    }
+                    throw new Error(errorMessage);
+                }
+                
+                let audioBytes, mimeType, source;
+                
+                // 根据Content-Type处理不同的响应格式
+                if (contentType.includes('application/json')) {
+                    // JSON响应：包含Base64编码的音频数据
+                    const data = await response.json();
+                    
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    
+                    // 提取Base64音频数据
+                    const base64Audio = data.data || data.audio_base64 || data.audio;
+                    if (!base64Audio) {
+                        throw new Error('TTS返回格式异常：未找到音频数据');
+                    }
+                    
+                    console.info('TTS JSON响应处理:', {
+                        hasData: !!data.data,
+                        hasAudio: !!data.audio,
+                        hasAudioBase64: !!data.audio_base64,
+                        base64Length: base64Audio.length,
+                        encoding: data.encoding
+                    });
+                    
+                    // 使用工具函数解码Base64
+                    audioBytes = safeBase64ToBytes(base64Audio);
+                    mimeType = detectAudioMimeType(null, 'audio/wav');
+                    source = 'json-base64';
+                    
+                    // 根据服务器返回的编码信息调整MIME类型
+                    if (data.encoding === 'wav') {
+                        mimeType = 'audio/wav';
+                    } else if (data.encoding === 'mp3' || data.encoding === 'mpeg') {
+                        mimeType = 'audio/mpeg';
+                    }
+                    
+                } else {
+                    // 二进制响应：直接的音频流
+                    const arrayBuffer = await response.arrayBuffer();
+                    audioBytes = new Uint8Array(arrayBuffer);
+                    mimeType = detectAudioMimeType(contentType, 'audio/wav');
+                    source = 'binary';
+                    
+                    console.info('TTS二进制响应处理:', {
+                        contentType: contentType
+                    });
+                }
+                
+                // 打印关键日志
+                console.info('TTS音频处理完成:', {
+                    base64Length: source === 'json-base64' ? base64Audio?.length : undefined,
+                    byteLength: audioBytes.length,
+                    mime: mimeType,
+                    source: source,
+                    note: 'tts-preview'
+                });
+                
+                // 清理旧的音频URL
+                if (audio.src && audio.src.startsWith('blob:')) {
+                    revokeAudioUrl(audio.src);
+                }
+                
+                // 使用工具函数创建音频URL
+                const audioUrl = buildAudioUrlFromBytes(audioBytes, mimeType);
+                
+                // 设置音频源
+                audio.onerror = (e) => {
+                    console.error('音频播放失败:', {
+                        error: e,
+                        src: audio.src,
+                        mimeType: mimeType,
+                        bytesLength: audioBytes.length
+                    });
+                    showStatus('音频播放失败，请检查音频格式', 'error');
+                };
+                
+                audio.onloadeddata = () => {
+                    console.info('音频加载成功:', {
+                        duration: audio.duration,
+                        src: audio.src.substring(0, 50) + '...',
+                        mimeType: mimeType
+                    });
+                    showStatus(`音频加载成功，时长: ${audio.duration.toFixed(2)}秒`, 'success');
+                };
+                
+                audio.src = audioUrl;
+                await audio.load();
+                
+                // 尝试自动播放
+                try {
+                    await audio.play();
+                    showStatus('音频播放成功！', 'success');
+                } catch (playError) {
+                    console.warn('自动播放被阻止:', playError.message);
+                    showStatus('音频已准备就绪，请手动点击播放', 'info');
+                }
+                
+            } catch (error) {
+                console.error('TTS测试失败:', error);
+                showStatus(`TTS测试失败: ${error.message}`, 'error');
+            } finally {
+                testBtn.disabled = false;
+                testBtn.textContent = '🎤 请求 TTS 并播放';
+            }
+        }
+        
+        // 清空日志功能
+        function clearLog() {
+            logContainer.innerHTML = '<div>📋 控制台日志将在这里显示...</div>';
+        }
+        
+        // 绑定事件
+        document.getElementById('testTtsBtn').addEventListener('click', testTtsAudio);
+        document.getElementById('clearLogBtn').addEventListener('click', clearLog);
+        
+        // 页面加载完成提示
+        console.info('TTS音频测试页面已加载完成');
+        showStatus('测试页面已准备就绪', 'success');
+    </script>
+</body>
+</html>

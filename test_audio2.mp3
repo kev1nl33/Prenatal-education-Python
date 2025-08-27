@@ -1,0 +1,1 @@
+{"ok": false, "errorCode": "SYNTHESIS_ERROR", "message": "Invalid request: {\"reqid\":\"prenatal_1756002685263\",\"code\":3001,\"operation\":\"query\",\"message\":\"Invalid workflow synthesize_with_sami,codec\",\"sequence\":null}", "cost": 0.0, "fromCache": false, "requestId": "6f116a51", "sessionId": "1df92ff6", "provider": "volcengine", "latency": 0.183}
