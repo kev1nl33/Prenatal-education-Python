@@ -61,14 +61,10 @@ def _get_cors_headers(request_id=None, from_cache=False, cost_estimated=0.0, mod
     return headers
 
 
+# 鉴权逻辑已移至server.py中统一处理，此函数保留用于兼容性
 def _verify_auth(headers):
-    """验证访问令牌"""
-    auth_token = os.environ.get('AUTH_TOKEN', '')
-    if not auth_token:
-        return True  # 如果未设置AUTH_TOKEN，则允许访问
-    
-    request_token = headers.get('X-Auth-Token', '')
-    return request_token == auth_token
+    """验证访问令牌 - 已在server.py中处理"""
+    return True  # 鉴权已在上层处理
 
 
 def _check_origin(headers):
@@ -145,21 +141,7 @@ class handler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
                 return
             
-            # 中间件：验证访问令牌
-            if not _verify_auth(self.headers):
-                cors_headers = _get_cors_headers(request_id=request_id, mode=mode)
-                self.send_response(401)
-                for key, value in cors_headers.items():
-                    self.send_header(key, value)
-                self.end_headers()
-                response = {
-                    "ok": False,
-                    "errorCode": "UNAUTHORIZED",
-                    "message": "Invalid or missing authentication token",
-                    "requestId": request_id
-                }
-                self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
-                return
+            # 鉴权验证已在server.py中统一处理，此处无需重复验证
             
             # 中间件：检查请求来源
             if not _check_origin(self.headers):
@@ -183,17 +165,17 @@ class handler(BaseHTTPRequestHandler):
             raw = raw_data.decode("utf-8") if raw_data else ""
             data = json.loads(raw) if raw else {}
             
-            # 提取参数
+            # 提取参数 - 所有配置从环境变量读取，不再依赖前端传递
             text = data.get("text", "").strip()
-            voice_type = data.get("voice_type", "zh_female_qingxin")
-            emotion = data.get("emotion", "neutral")  # happy 或 neutral
-            quality = data.get("quality", "draft")  # draft 或 high
+            voice_type = data.get("voice_type") or os.environ.get('TTS_DEFAULT_VOICE', "zh_female_qingxin")
+            emotion = data.get("emotion") or os.environ.get('TTS_DEFAULT_EMOTION', "neutral")  # happy 或 neutral
+            quality = data.get("quality") or os.environ.get('TTS_DEFAULT_QUALITY', "draft")  # draft 或 high
             # 支持从请求头读取干跑标记（X-Dry-Run）以及从请求体读取 dry_run 字段
             dry_run_header_raw = self.headers.get('X-Dry-Run', '')
             dry_run_from_header = str(dry_run_header_raw).lower() in ("true", "1", "yes", "y")
             dry_run_param = bool(data.get("dry_run", False)) or dry_run_from_header
-            # 使用固定的默认 Resource ID
-            resource_id = "volc.service_type.10029"
+            # Resource ID 从环境变量读取
+            resource_id = os.environ.get('TTS_RESOURCE_ID', 'volc.service_type.10029')
             
             # 生成 session_id（hash8）用于可观测性
             session_id = hashlib.sha256(f"{request_id}_{time.time()}".encode()).hexdigest()[:8]

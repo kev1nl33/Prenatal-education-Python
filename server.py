@@ -20,9 +20,55 @@ def load_env():
 # 在启动时加载环境变量
 load_env()
 
+# 鉴权中间件
+def verify_auth_token(handler):
+    """验证请求的X-Auth-Token"""
+    auth_token = handler.headers.get('X-Auth-Token')
+    
+    # 从环境变量获取允许的令牌列表
+    allowed_tokens = os.environ.get('ALLOWED_TOKENS', '')
+    if not allowed_tokens:
+        print('[AUTH] No ALLOWED_TOKENS configured')
+        return False
+    
+    # 解析逗号分隔的令牌列表
+    token_list = [token.strip() for token in allowed_tokens.split(',') if token.strip()]
+    
+    if not auth_token:
+        print('[AUTH] Missing X-Auth-Token header')
+        return False
+    
+    if auth_token not in token_list:
+        print(f'[AUTH] Invalid token: {auth_token[:10]}...')
+        return False
+    
+    print('[AUTH] Token validation successful')
+    return True
+
+def send_auth_error(handler):
+    """发送401鉴权错误响应"""
+    try:
+        handler.send_response(401)
+        handler.send_header('Content-Type', 'application/json')
+        handler.send_header('Access-Control-Allow-Origin', '*')
+        handler.end_headers()
+        error_response = {
+            "error_code": "MISSING_OR_INVALID_TOKEN",
+            "how_to_fix": "请联系管理员申请有效的访问令牌"
+        }
+        handler.wfile.write(json.dumps(error_response, ensure_ascii=False).encode('utf-8'))
+    except (BrokenPipeError, ConnectionResetError):
+        print("Client disconnected before auth error response could be sent")
+
 class APIHandler(SimpleHTTPRequestHandler):
     def do_POST(self):
         parsed_path = urlparse(self.path)
+        
+        # 对所有API请求进行鉴权验证
+        if parsed_path.path.startswith('/api/'):
+            if not verify_auth_token(self):
+                send_auth_error(self)
+                return
         
         if parsed_path.path == '/api/ark':
             print('[SERVER] Routing to /api/ark')
@@ -104,6 +150,11 @@ class APIHandler(SimpleHTTPRequestHandler):
         parsed_path = urlparse(self.path)
         
         if parsed_path.path.startswith('/api/'):
+            # 对所有API请求进行鉴权验证
+            if not verify_auth_token(self):
+                send_auth_error(self)
+                return
+            
             # 特殊处理voice_clone API的GET请求
             if parsed_path.path == '/api/voice_clone':
                 try:

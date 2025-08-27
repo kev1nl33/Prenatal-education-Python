@@ -51,14 +51,10 @@ def _get_cors_headers(request_id=None, from_cache=None, cost_estimated=None, mod
     return headers
 
 
+# 鉴权逻辑已移至server.py中统一处理，此函数保留用于兼容性
 def _verify_auth(headers):
-    """验证访问令牌"""
-    auth_token = os.environ.get('AUTH_TOKEN', '')
-    if not auth_token or auth_token in ['your_auth_token_here']:
-        return True  # 如果未配置认证令牌，则允许访问
-    
-    request_token = headers.get('X-Auth-Token', '')
-    return request_token == auth_token
+    """验证访问令牌 - 已在server.py中处理"""
+    return True  # 鉴权已在上层处理
 
 
 def _check_origin(headers):
@@ -135,21 +131,7 @@ class handler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
                 return
             
-            # 中间件：验证访问令牌
-            if not _verify_auth(self.headers):
-                cors_headers = _get_cors_headers(request_id=request_id, mode=mode)
-                self.send_response(401)
-                for key, value in cors_headers.items():
-                    self.send_header(key, value)
-                self.end_headers()
-                response = {
-                    "ok": False,
-                    "errorCode": "UNAUTHORIZED",
-                    "message": "Invalid or missing authentication token",
-                    "requestId": request_id
-                }
-                self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
-                return
+            # 鉴权验证已在server.py中统一处理，此处无需重复验证
             
             # 中间件：检查请求来源
             if not _check_origin(self.headers):
@@ -173,9 +155,9 @@ class handler(BaseHTTPRequestHandler):
             raw = raw_data.decode("utf-8") if raw_data else ""
             data = json.loads(raw) if raw else {}
             
-            # 提取参数
+            # 提取参数 - 所有配置从环境变量读取，不再依赖前端传递
             prompt = data.get("prompt", "").strip()
-            model = data.get("model") or os.environ.get('ARK_MODEL', 'doubao-seed-1-6-flash-250715')
+            model = os.environ.get('ARK_MODEL', 'doubao-seed-1-6-flash-250715')  # 模型从环境变量读取
             dry_run_param = data.get("dry_run", False)
             
             # 检查是否为干跑模式
