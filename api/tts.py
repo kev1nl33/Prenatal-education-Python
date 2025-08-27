@@ -185,6 +185,18 @@ class handler(BaseHTTPRequestHandler):
             print(f"[TTS INFO] request_id={request_id} session_id={session_id} resource_id_hash={resource_id_hash} text_length={len(text)} voice_type={voice_type} emotion={emotion} quality={quality}")
             print(f"[TTS DEBUG] Dry-run detected: {'yes' if dry_run_param else 'no'} (header={dry_run_header_raw})")
             
+            # 添加配置检测日志
+            tts_api_key = os.environ.get('TTS_API_KEY', '')
+            tts_app_id = os.environ.get('TTS_APP_ID', '')
+            tts_access_token = os.environ.get('TTS_ACCESS_TOKEN', '')
+            print(f"[TTS DEBUG] TTS_API_KEY configured: {'yes' if tts_api_key else 'no'}")
+            print(f"[TTS DEBUG] TTS_APP_ID configured: {'yes' if tts_app_id else 'no'}")
+            print(f"[TTS DEBUG] TTS_ACCESS_TOKEN configured: {'yes' if tts_access_token else 'no'}")
+            print(f"[TTS DEBUG] Current mode: {mode}")
+            print(f"[TTS DEBUG] MODE env var: {os.environ.get('MODE', 'none')}")
+            print(f"[TTS DEBUG] VERCEL_ENV: {os.environ.get('VERCEL_ENV', 'none')}")
+            print(f"[TTS DEBUG] Provider: {get_speech_service(mode).__class__.__name__.lower().replace('speechadapter', '')}")
+            
             # 检查是否为干跑模式
             is_dry_run_mode = is_dry_run() or dry_run_param
             

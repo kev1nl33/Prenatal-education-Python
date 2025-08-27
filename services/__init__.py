@@ -27,10 +27,18 @@ def get_speech_service(mode: Optional[str] = None) -> SpeechSynthesizer:
         if mode is None:
             # 根据环境自动检测模式
             if os.getenv('VERCEL') or os.getenv('VERCEL_ENV'):
-                # 在 Vercel 环境中，如果没有设置必要的 TTS 配置，使用本地模式
+                # 在 Vercel 环境中，检查是否配置了TTS服务
+                # 支持两种配置方式：TTS_API_KEY 或 火山引擎的 TTS_APP_ID+TTS_ACCESS_TOKEN
                 tts_api_key = os.getenv('TTS_API_KEY', '')
+                tts_app_id = os.getenv('TTS_APP_ID', '')
+                tts_access_token = os.getenv('TTS_ACCESS_TOKEN', '')
+                
                 has_api_key = bool(tts_api_key and tts_api_key != 'your_tts_api_key_here')
-                mode = 'prod' if has_api_key else 'local'
+                has_volc_config = bool(tts_app_id and tts_access_token and 
+                                     tts_app_id != 'your_app_id_here' and 
+                                     tts_access_token != 'your_access_token_here')
+                
+                mode = 'prod' if (has_api_key or has_volc_config) else 'local'
             elif os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('RENDER'):
                 mode = 'prod'  # 其他云平台默认使用生产模式
             else:
@@ -60,10 +68,18 @@ def get_current_mode() -> str:
     if mode is None:
         # 根据环境自动检测模式
         if os.getenv('VERCEL') or os.getenv('VERCEL_ENV'):
-            # 在 Vercel 环境中，仅依据 API Key 判断是否启用生产模式
+            # 在 Vercel 环境中，检查是否配置了TTS服务
+            # 支持两种配置方式：TTS_API_KEY 或 火山引擎的 TTS_APP_ID+TTS_ACCESS_TOKEN
             tts_api_key = os.getenv('TTS_API_KEY', '')
+            tts_app_id = os.getenv('TTS_APP_ID', '')
+            tts_access_token = os.getenv('TTS_ACCESS_TOKEN', '')
+            
             has_api_key = bool(tts_api_key and tts_api_key != 'your_tts_api_key_here')
-            mode = 'prod' if has_api_key else 'local'
+            has_volc_config = bool(tts_app_id and tts_access_token and 
+                                 tts_app_id != 'your_app_id_here' and 
+                                 tts_access_token != 'your_access_token_here')
+            
+            mode = 'prod' if (has_api_key or has_volc_config) else 'local'
         elif os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('RENDER'):
             mode = 'prod'  # 其他云平台默认使用生产模式
         else:
