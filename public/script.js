@@ -17,10 +17,178 @@ const storage = {
   }
 };
 
+// 密码验证配置
+const AUTH_CONFIG = {
+  password: 'xiaoman', // 访问密码
+  storageKey: 'prenatal_auth_verified',
+  tokenKey: 'prenatal_auth_token'
+};
+
+// 检查用户是否已通过密码验证
+function isAuthenticated() {
+  const verified = localStorage.getItem(AUTH_CONFIG.storageKey);
+  const token = localStorage.getItem(AUTH_CONFIG.tokenKey);
+  return verified === 'true' && token === 'demo-token-2024';
+}
+
+// 显示密码输入对话框
+function showPasswordDialog() {
+  return new Promise((resolve, reject) => {
+    // 创建遮罩层
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    `;
+    
+    // 创建密码输入框
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+    `;
+    
+    dialog.innerHTML = `
+      <h2 style="margin: 0 0 20px 0; color: #333; font-size: 24px;">🔐 访问验证</h2>
+      <p style="margin: 0 0 20px 0; color: #666; line-height: 1.5;">请输入访问密码以使用胎教语音生成服务</p>
+      <input type="password" id="passwordInput" placeholder="请输入密码" style="
+        width: 100%;
+        padding: 12px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        font-size: 16px;
+        margin-bottom: 20px;
+        box-sizing: border-box;
+      ">
+      <div style="display: flex; gap: 10px; justify-content: center;">
+        <button id="confirmBtn" style="
+          background: #4CAF50;
+          color: white;
+          border: none;
+          padding: 12px 24px;
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 16px;
+          min-width: 80px;
+        ">确认</button>
+        <button id="cancelBtn" style="
+          background: #f44336;
+          color: white;
+          border: none;
+          padding: 12px 24px;
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 16px;
+          min-width: 80px;
+        ">取消</button>
+      </div>
+      <div id="errorMsg" style="
+        color: #f44336;
+        margin-top: 15px;
+        font-size: 14px;
+        display: none;
+      "></div>
+    `;
+    
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+    
+    const passwordInput = dialog.querySelector('#passwordInput');
+    const confirmBtn = dialog.querySelector('#confirmBtn');
+    const cancelBtn = dialog.querySelector('#cancelBtn');
+    const errorMsg = dialog.querySelector('#errorMsg');
+    
+    // 聚焦到密码输入框
+    setTimeout(() => passwordInput.focus(), 100);
+    
+    // 验证密码
+    function verifyPassword() {
+      const password = passwordInput.value.trim();
+      if (password === AUTH_CONFIG.password) {
+        // 密码正确，保存验证状态
+        localStorage.setItem(AUTH_CONFIG.storageKey, 'true');
+        localStorage.setItem(AUTH_CONFIG.tokenKey, 'demo-token-2024');
+        document.body.removeChild(overlay);
+        // 显示退出登录按钮
+        setTimeout(() => toggleLogoutButton(), 100);
+        resolve('demo-token-2024');
+      } else {
+        // 密码错误
+        errorMsg.textContent = '密码错误，请重试';
+        errorMsg.style.display = 'block';
+        passwordInput.value = '';
+        passwordInput.focus();
+      }
+    }
+    
+    // 事件监听
+    confirmBtn.addEventListener('click', verifyPassword);
+    passwordInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        verifyPassword();
+      }
+    });
+    
+    cancelBtn.addEventListener('click', () => {
+      document.body.removeChild(overlay);
+      reject(new Error('用户取消了密码验证'));
+    });
+  });
+}
+
+// 退出登录
+function logout() {
+  if (confirm('确定要退出登录吗？退出后需要重新输入密码才能使用。')) {
+    localStorage.removeItem(AUTH_CONFIG.storageKey);
+    localStorage.removeItem(AUTH_CONFIG.tokenKey);
+    location.reload(); // 刷新页面重新验证
+  }
+}
+
+// 显示/隐藏退出登录按钮
+function toggleLogoutButton() {
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    if (isAuthenticated()) {
+      logoutBtn.style.display = 'flex';
+    } else {
+      logoutBtn.style.display = 'none';
+    }
+  }
+}
+
 // 获取认证Token
 function getAuthToken() {
-  // 使用.env文件中配置的Token值，与后端ALLOWED_TOKENS匹配
-  return 'demo-token-2024';
+  if (!isAuthenticated()) {
+    throw new Error('未通过密码验证，请先登录');
+  }
+  return localStorage.getItem(AUTH_CONFIG.tokenKey) || 'demo-token-2024';
+}
+
+// 异步获取认证Token（用于需要密码验证的场景）
+async function getAuthTokenAsync() {
+  if (isAuthenticated()) {
+    return getAuthToken();
+  }
+  
+  try {
+    return await showPasswordDialog();
+  } catch (error) {
+    throw new Error('密码验证失败：' + error.message);
+  }
 }
 
 // 历史记录管理
@@ -557,7 +725,7 @@ async function arkGenerate(prompt, model) {
 
     const headers = {
       'Content-Type': 'application/json',
-      'X-Auth-Token': getAuthToken() // 使用统一的Token获取函数
+      'X-Auth-Token': await getAuthTokenAsync() // 使用异步Token获取函数
     };
 
 
@@ -654,7 +822,7 @@ async function ttsSynthesize(payload) {
 
     const headers = {
       'Content-Type': 'application/json',
-      'X-Auth-Token': getAuthToken() // 使用统一的Token获取函数
+      'X-Auth-Token': await getAuthTokenAsync() // 使用异步Token获取函数
     };
 
     // 根据文本长度调整超时时间
@@ -849,8 +1017,91 @@ const el = {
 
 // 移除设置模态框相关函数
 
+// 初始化密码保护
+async function initPasswordProtection() {
+  if (!isAuthenticated()) {
+    try {
+      await showPasswordDialog();
+      showSuccess('验证成功，欢迎使用胎教语音生成服务！');
+    } catch (error) {
+      document.body.innerHTML = `
+        <div style="
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 100vh;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          font-family: Arial, sans-serif;
+          text-align: center;
+        ">
+          <div>
+            <h1>🔒 访问被拒绝</h1>
+            <p>您需要输入正确的密码才能访问此服务</p>
+            <button onclick="location.reload()" style="
+              background: white;
+              color: #667eea;
+              border: none;
+              padding: 12px 24px;
+              border-radius: 8px;
+              cursor: pointer;
+              font-size: 16px;
+              margin-top: 20px;
+            ">重新验证</button>
+          </div>
+        </div>
+      `;
+      return false;
+    }
+  }
+  return true;
+}
+
+// 添加退出登录按钮到页面
+function addLogoutButton() {
+  // 检查是否已存在退出按钮
+  if (document.getElementById('logoutBtn')) return;
+  
+  const logoutBtn = document.createElement('button');
+  logoutBtn.id = 'logoutBtn';
+  logoutBtn.innerHTML = '🚪 退出登录';
+  logoutBtn.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #f44336;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    z-index: 1000;
+    box-shadow: 0 2px 8px rgba(244, 67, 54, 0.3);
+  `;
+  
+  logoutBtn.addEventListener('click', () => {
+    if (confirm('确定要退出登录吗？')) {
+      logout();
+    }
+  });
+  
+  document.body.appendChild(logoutBtn);
+}
+
 // 初始化
-function init() {
+async function init() {
+  // 首先进行密码验证
+  const authSuccess = await initPasswordProtection();
+  if (!authSuccess) return;
+  
+  // 显示退出登录按钮并绑定事件
+  toggleLogoutButton();
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', logout);
+  }
+  
   // 移除API配置初始化，改为后端托管
   
   // 初始化内容卡片选择
@@ -2064,7 +2315,7 @@ async function voiceCloneAPI(action, data = {}) {
   try {
     const headers = {
       'Content-Type': 'application/json',
-      'X-Auth-Token': getAuthToken() // 使用统一的Token获取函数
+      'X-Auth-Token': await getAuthTokenAsync() // 使用异步Token获取函数
     };
 
     const payload = {
@@ -2106,7 +2357,7 @@ async function voiceCloneAPI(action, data = {}) {
 async function getClonedVoices() {
   try {
     const headers = {
-      'X-Auth-Token': getAuthToken() // 使用统一的Token获取函数
+      'X-Auth-Token': await getAuthTokenAsync() // 使用异步Token获取函数
     };
     const response = await fetch(`${API_BASE}/api/voice_clone?action=list`, { 
       headers,
@@ -2135,7 +2386,7 @@ async function getClonedVoices() {
 async function getTrainingStatus(speakerId) {
   try {
     const headers = {
-      'X-Auth-Token': getAuthToken() // 使用统一的Token获取函数
+      'X-Auth-Token': await getAuthTokenAsync() // 使用异步Token获取函数
     };
     const response = await fetch(`${API_BASE}/api/voice_clone?action=status&speaker_id=${speakerId}`, { 
       headers,
@@ -2725,10 +2976,17 @@ window.addEventListener('beforeunload', () => {
   }
 });
 
-init();
-
-// 初始化声音复刻功能
-initVoiceClone();
+// 异步初始化应用
+(async () => {
+  try {
+    await init();
+    // 初始化声音复刻功能
+    initVoiceClone();
+  } catch (error) {
+    console.error('应用初始化失败:', error);
+    showError('应用初始化失败，请刷新页面重试');
+  }
+})();
 
 // 为历史记录项生成语音
 async function generateAudioForHistoryItem(text) {
