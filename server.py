@@ -2,258 +2,144 @@
 import os
 import sys
 import json
-from http.server import HTTPServer, SimpleHTTPRequestHandler, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
-import importlib.util
+import logging
+import traceback
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+from urllib.parse import urlparse
+from dotenv import load_dotenv
 
-# 加载环境变量
-def load_env():
-    env_path = '.env'
-    if os.path.exists(env_path):
-        with open(env_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
-                    os.environ[key.strip()] = value.strip()
+# 在启动时加载 .env 文件
+load_dotenv()
 
-# 在启动时加载环境变量
-load_env()
+# --- 日志服务初始化 ---
+# 必须在其他模块导入之前调用，以确保日志配置在应用启动时立即生效
+try:
+    from services.logger_setup import setup_logging
+    setup_logging()
+except ImportError as e:
+    # 如果日志模块导入失败，使用标准输出并退出
+    print(f"CRITICAL: Failed to import or set up logging service: {e}", file=sys.stderr)
+    sys.exit(1)
 
-# 鉴权中间件
-def verify_auth_token(handler):
-    """验证请求的X-Auth-Token"""
-    auth_token = handler.headers.get('X-Auth-Token')
-    
-    # 从环境变量获取允许的令牌列表
-    allowed_tokens = os.environ.get('ALLOWED_TOKENS', '')
-    if not allowed_tokens:
-        print('[AUTH] No ALLOWED_TOKENS configured')
-        return False
-    
-    # 解析逗号分隔的令牌列表
-    token_list = [token.strip() for token in allowed_tokens.split(',') if token.strip()]
-    
-    if not auth_token:
-        print('[AUTH] Missing X-Auth-Token header')
-        return False
-    
-    if auth_token not in token_list:
-        print(f'[AUTH] Invalid token: {auth_token[:10]}...')
-        return False
-    
-    print('[AUTH] Token validation successful')
-    return True
 
-def send_auth_error(handler):
-    """发送401鉴权错误响应"""
-    try:
-        handler.send_response(401)
-        handler.send_header('Content-Type', 'application/json')
-        handler.send_header('Access-Control-Allow-Origin', '*')
-        handler.end_headers()
-        error_response = {
-            "error_code": "MISSING_OR_INVALID_TOKEN",
-            "how_to_fix": "请联系管理员申请有效的访问令牌"
-        }
-        handler.wfile.write(json.dumps(error_response, ensure_ascii=False).encode('utf-8'))
-    except (BrokenPipeError, ConnectionResetError):
-        print("Client disconnected before auth error response could be sent")
+# --- API 模块导入 ---
+# 在启动时导入所有API模块，以提高性能和可维护性
+try:
+    from api import ark, tts, voice_clone, health, debug
+except ImportError as e:
+    logging.critical(f"无法导入API模块. {e}", exc_info=True)
+    sys.exit(1)
 
-class APIHandler(SimpleHTTPRequestHandler):
-    def do_POST(self):
+# --- 主应用 ---
+
+class APIRouterHandler(SimpleHTTPRequestHandler):
+    """
+    一个请求处理器，负责路由API调用和提供静态文件服务。
+    - /api/ 下的路由会被分派到特定的处理器。
+    - 其他路由则提供 /public 目录下的静态文件。
+    """
+
+    # --- API 路由配置 ---
+    # 一个简单的路由字典，将URL路径映射到它们的处理器类。
+    API_ROUTES = {
+        '/api/ark': ark.handler,
+        '/api/tts': tts.handler,
+        '/api/voice_clone': voice_clone.handler,
+        '/api/health': health.handler, # 新增的健康检查路由
+    }
+
+    def _send_json_response(self, status_code, data, headers=None):
+        """发送标准JSON响应的辅助函数。"""
+        try:
+            self.send_response(status_code)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            if headers:
+                for key, value in headers.items():
+                    self.send_header(key, value)
+            self.end_headers()
+            self.wfile.write(json.dumps(data, ensure_ascii=False).encode('utf-8'))
+        except (BrokenPipeError, ConnectionResetError):
+            logging.warning("客户端在响应发送前断开了连接。")
+
+    def _dispatch_api_request(self):
+        """
+        所有 /api/ 请求的中央分派器。
+        """
         parsed_path = urlparse(self.path)
+        handler_class = self.API_ROUTES.get(parsed_path.path)
+
+        if not handler_class:
+            self._send_json_response(404, {"error": "API endpoint not found"})
+            return
+
+        try:
+            method_name = f'do_{self.command}'
+            handler_method = getattr(handler_class, method_name, None)
+
+            if handler_method:
+                logging.info(f'Routing {self.command} {self.path} -> {parsed_path.path}')
+                handler_method(self)
+            else:
+                self._send_json_response(405, {"error": f"Method {self.command} not allowed"})
+        except Exception as e:
+            logging.error(f"处理 {self.path} 时出错: {e}", exc_info=True)
+            self._send_json_response(500, {"error": f"Internal server error: {str(e)}"})
+
+    def _serve_static_file(self):
+        """提供 'public' 目录下的静态文件服务。"""
+        path = urlparse(self.path).path
+        if path in ('/', ''):
+            self.path = 'public/index.html'
+        elif not path.startswith('/public/'):
+            self.path = f'public{path}'
         
-        # 对所有API请求进行鉴权验证
-        if parsed_path.path.startswith('/api/'):
-            if not verify_auth_token(self):
-                send_auth_error(self)
-                return
-        
-        if parsed_path.path == '/api/ark':
-            print('[SERVER] Routing to /api/ark')
-            # 直接调用 ark.py 中 handler 的 do_POST，传入当前 self，避免重复实例化 BaseHTTPRequestHandler
-            try:
-                spec = importlib.util.spec_from_file_location("ark", "api/ark.py")
-                ark_module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(ark_module)
-                # 调用未绑定方法，复用当前请求上下文
-                ark_module.handler.do_POST(self)
-                return
-            except Exception as e:
-                print(f"Error handling /api/ark: {e}")
-                import traceback
-                traceback.print_exc()
-                try:
-                    self.send_response(500)
-                    self.send_header('Content-Type', 'application/json')
-                    self.send_header('Access-Control-Allow-Origin', '*')
-                    self.end_headers()
-                    error_response = {"error": f"Internal server error: {str(e)}"}
-                    self.wfile.write(json.dumps(error_response).encode('utf-8'))
-                except (BrokenPipeError, ConnectionResetError):
-                    # 客户端已断开连接，忽略错误
-                    print("Client disconnected before response could be sent")
-                return
-                
-        elif parsed_path.path == '/api/tts':
-            # 直接调用 tts.py 中 handler 的 do_POST，传入当前 self
-            try:
-                spec = importlib.util.spec_from_file_location("tts", "api/tts.py")
-                tts_module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(tts_module)
-                tts_module.handler.do_POST(self)
-                return
-            except Exception as e:
-                print(f"Error handling /api/tts: {e}")
-                import traceback
-                traceback.print_exc()
-                try:
-                    self.send_response(500)
-                    self.send_header('Content-Type', 'application/json')
-                    self.send_header('Access-Control-Allow-Origin', '*')
-                    self.end_headers()
-                    error_response = {"error": f"Internal server error: {str(e)}"}
-                    self.wfile.write(json.dumps(error_response).encode('utf-8'))
-                except (BrokenPipeError, ConnectionResetError):
-                    # 客户端已断开连接，忽略错误
-                    print("Client disconnected before response could be sent")
-                return
-                
-        elif parsed_path.path == '/api/voice_clone':
-            # 直接调用 voice_clone.py 中 handler 的 do_POST，传入当前 self
-            try:
-                spec = importlib.util.spec_from_file_location("voice_clone", "api/voice_clone.py")
-                voice_clone_module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(voice_clone_module)
-                voice_clone_module.handler.do_POST(self)
-                return
-            except Exception as e:
-                print(f"Error handling /api/voice_clone: {e}")
-                import traceback
-                traceback.print_exc()
-                try:
-                    self.send_response(500)
-                    self.send_header('Content-Type', 'application/json')
-                    self.send_header('Access-Control-Allow-Origin', '*')
-                    self.end_headers()
-                    error_response = {"error": f"Internal server error: {str(e)}"}
-                    self.wfile.write(json.dumps(error_response).encode('utf-8'))
-                except (BrokenPipeError, ConnectionResetError):
-                    # 客户端已断开连接，忽略错误
-                    print("Client disconnected before response could be sent")
-                return
-        else:
-            self.send_error(404, "API endpoint not found")
-    
+        # SimpleHTTPRequestHandler 需要路径不以斜杠开头
+        if self.path.startswith('/'):
+            self.path = self.path[1:]
+
+        super().do_GET()
+
     def do_GET(self):
-        parsed_path = urlparse(self.path)
-        
-        if parsed_path.path.startswith('/api/'):
-            # 对所有API请求进行鉴权验证
-            if not verify_auth_token(self):
-                send_auth_error(self)
-                return
-            
-            # 特殊处理voice_clone API的GET请求
-            if parsed_path.path == '/api/voice_clone':
-                try:
-                    spec = importlib.util.spec_from_file_location("voice_clone", "api/voice_clone.py")
-                    voice_clone_module = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(voice_clone_module)
-                    voice_clone_module.handler.do_GET(self)
-                    return
-                except Exception as e:
-                    print(f"Error handling GET /api/voice_clone: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    try:
-                        self.send_response(500)
-                        self.send_header('Content-Type', 'application/json')
-                        self.send_header('Access-Control-Allow-Origin', '*')
-                        self.end_headers()
-                        error_response = {"error": f"Internal server error: {str(e)}"}
-                        self.wfile.write(json.dumps(error_response).encode('utf-8'))
-                    except (BrokenPipeError, ConnectionResetError):
-                        print("Client disconnected before response could be sent")
-                    return
-            else:
-                print(f"[SERVER] GET {parsed_path.path} -> 405")
-                # 其他API端点不支持GET请求
-                self.send_response(405)
-                self.send_header('Content-Type', 'application/json')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.send_header('Allow', 'POST, OPTIONS')
-                self.end_headers()
-                error_response = {"error": "Method not allowed. Use POST for API requests."}
-                self.wfile.write(json.dumps(error_response).encode('utf-8'))
-                return
+        if self.path.startswith('/api/'):
+            self._dispatch_api_request()
         else:
-            # 处理静态文件请求
-            # 如果访问根路径，重定向到 index.html
-            if parsed_path.path == '/' or parsed_path.path == '':
-                self.path = 'public/index.html'
-            elif not parsed_path.path.startswith('/public/'):
-                # 其他路径也重定向到 public 目录
-                self.path = 'public' + parsed_path.path
-            else:
-                # 如果已经是/public/开头，去掉开头的斜杠
-                self.path = parsed_path.path[1:]
-            
-            super().do_GET()
-    
+            self._serve_static_file()
+
+    def do_POST(self):
+        if self.path.startswith('/api/'):
+            self._dispatch_api_request()
+        else:
+            self._send_json_response(405, {"error": "Method not allowed for static resources"})
+
     def do_OPTIONS(self):
-        parsed_path = urlparse(self.path)
-        
-        if parsed_path.path.startswith('/api/'):
-            # 处理CORS预检请求
-            try:
-                if parsed_path.path == '/api/ark':
-                    spec = importlib.util.spec_from_file_location("ark", "api/ark.py")
-                    ark_module = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(ark_module)
-                    # 直接调用模块中的 do_OPTIONS，复用当前 self
-                    ark_module.handler.do_OPTIONS(self)
-                    return
-                elif parsed_path.path == '/api/tts':
-                    spec = importlib.util.spec_from_file_location("tts", "api/tts.py")
-                    tts_module = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(tts_module)
-                    tts_module.handler.do_OPTIONS(self)
-                    return
-                elif parsed_path.path == '/api/voice_clone':
-                    spec = importlib.util.spec_from_file_location("voice_clone", "api/voice_clone.py")
-                    voice_clone_module = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(voice_clone_module)
-                    voice_clone_module.handler.do_OPTIONS(self)
-                    return
-            except Exception as e:
-                print(f"Error handling OPTIONS: {e}")
-                self.send_error(500, f"Internal server error: {e}")
-                return
-        else:
-            # 对于非API请求，使用默认的OPTIONS处理
-            super().do_OPTIONS()
+        self.send_response(204)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, X-Auth-Token, X-Api-Resource-Id')
+        self.end_headers()
 
 def run_server(port=8000):
+    """启动本地开发服务器。"""
     server_address = ('', port)
-    httpd = HTTPServer(server_address, APIHandler)
-    print(f"Starting server on port {port}...")
-    print(f"Server running at http://localhost:{port}/")
+    httpd = HTTPServer(server_address, APIRouterHandler)
+    logging.info(f"Starting server on port {port}...")
+    logging.info(f"Server running at http://localhost:{port}/")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        print("\nShutting down server...")
+        logging.info("\nShutting down server...")
         httpd.shutdown()
 
-# Export handler for Vercel Python Runtime
-handler = APIHandler
+# 为Vercel运行时导出处理器
+handler = APIRouterHandler
+
 if __name__ == '__main__':
     port = 8000
     if len(sys.argv) > 1:
         try:
             port = int(sys.argv[1])
         except ValueError:
-            print("Invalid port number, using default 8000")
+            logging.warning(f"无效的端口号 '{sys.argv[1]}', 使用默认端口 {port}.")
     
     run_server(port)

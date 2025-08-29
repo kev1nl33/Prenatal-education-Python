@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data-Role 测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        button {
+            margin: 5px;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #console-output {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Data-Role 功能测试</h1>
+        
+        <div class="test-section">
+            <h2>1. Data-Role 元素查找测试</h2>
+            <p>测试是否能正确找到所有配置的 data-role 元素</p>
+            <button onclick="testDataRoleElements()">运行测试</button>
+            <div id="role-test-result" class="test-result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>2. 元素获取函数测试</h2>
+            <p>测试 safeGetElementByRole 函数是否正常工作</p>
+            <button onclick="testElementGetter()">运行测试</button>
+            <div id="getter-test-result" class="test-result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>3. ROLE-AUDIT 系统测试</h2>
+            <p>测试角色审计系统是否正常工作</p>
+            <button onclick="testRoleAudit()">运行测试</button>
+            <div id="audit-test-result" class="test-result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>4. 控制台输出</h2>
+            <p>查看详细的测试输出和调试信息</p>
+            <button onclick="clearConsole()">清空控制台</button>
+            <div id="console-output"></div>
+        </div>
+    </div>
+    
+    <script>
+        // 重定向console.log到页面
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+        const originalGroup = console.group;
+        const originalGroupEnd = console.groupEnd;
+        
+        const consoleOutput = document.getElementById('console-output');
+        
+        function addToConsole(message, type = 'log') {
+            const timestamp = new Date().toLocaleTimeString();
+            consoleOutput.textContent += `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addToConsole(args.join(' '), 'log');
+        };
+        
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            addToConsole(args.join(' '), 'warn');
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addToConsole(args.join(' '), 'error');
+        };
+        
+        console.group = function(...args) {
+            originalGroup.apply(console, args);
+            addToConsole('GROUP: ' + args.join(' '), 'group');
+        };
+        
+        console.groupEnd = function() {
+            originalGroupEnd.apply(console);
+            addToConsole('GROUP END', 'group');
+        };
+        
+        function clearConsole() {
+            consoleOutput.textContent = '';
+        }
+        
+        // 测试函数
+        function testDataRoleElements() {
+            const resultDiv = document.getElementById('role-test-result');
+            const expectedRoles = [
+                'settings-btn',
+                'close-modal', 
+                'cancel-config',
+                'settings-modal',
+                'api-key-input'
+            ];
+            
+            let foundCount = 0;
+            let results = [];
+            
+            expectedRoles.forEach(role => {
+                const element = document.querySelector(`[data-role="${role}"]`);
+                if (element) {
+                    foundCount++;
+                    results.push(`✅ ${role}: 找到`);
+                    console.log(`找到元素: [data-role="${role}"]`, element);
+                } else {
+                    results.push(`❌ ${role}: 未找到`);
+                    console.warn(`未找到元素: [data-role="${role}"]`);
+                }
+            });
+            
+            const success = foundCount === expectedRoles.length;
+            resultDiv.className = `test-result ${success ? 'success' : 'error'}`;
+            resultDiv.innerHTML = `
+                <strong>测试结果:</strong> ${foundCount}/${expectedRoles.length} 个元素找到<br>
+                ${results.join('<br>')}
+            `;
+            
+            console.log(`Data-Role 元素测试完成: ${foundCount}/${expectedRoles.length}`);
+        }
+        
+        function testElementGetter() {
+            const resultDiv = document.getElementById('getter-test-result');
+            
+            // 模拟 safeGetElementByRole 函数
+            function safeGetElementByRole(role, required = true) {
+                const element = document.querySelector(`[data-role="${role}"]`);
+                if (!element && required) {
+                    console.warn(`元素未找到: [data-role="${role}"]`);
+                }
+                return element;
+            }
+            
+            const testRoles = ['settings-btn', 'nonexistent-role'];
+            let results = [];
+            
+            testRoles.forEach(role => {
+                const element = safeGetElementByRole(role, false);
+                if (element) {
+                    results.push(`✅ ${role}: 函数正常返回元素`);
+                    console.log(`safeGetElementByRole('${role}') 返回:`, element);
+                } else {
+                    results.push(`⚠️ ${role}: 函数正常返回 null`);
+                    console.log(`safeGetElementByRole('${role}') 返回: null`);
+                }
+            });
+            
+            resultDiv.className = 'test-result success';
+            resultDiv.innerHTML = `
+                <strong>元素获取函数测试结果:</strong><br>
+                ${results.join('<br>')}
+            `;
+            
+            console.log('元素获取函数测试完成');
+        }
+        
+        function testRoleAudit() {
+            const resultDiv = document.getElementById('audit-test-result');
+            
+            // 模拟 performRoleAudit 函数
+            function performRoleAudit() {
+                console.log('🔍 [ROLE-AUDIT] 开始角色审计...');
+                
+                const expectedRoles = [
+                    'settings-btn',
+                    'close-modal', 
+                    'cancel-config',
+                    'settings-modal',
+                    'api-key-input'
+                ];
+                
+                const foundRoles = [];
+                const missingRoles = [];
+                
+                expectedRoles.forEach(role => {
+                    const element = document.querySelector(`[data-role="${role}"]`);
+                    if (element) {
+                        foundRoles.push({
+                            role: role,
+                            element: element.tagName.toLowerCase(),
+                            id: element.id || 'N/A',
+                            className: element.className || 'N/A'
+                        });
+                    } else {
+                        missingRoles.push(role);
+                    }
+                });
+                
+                console.group('📊 [ROLE-AUDIT] 角色审计报告');
+                
+                if (foundRoles.length > 0) {
+                    console.log('✅ 成功找到的 data-role:');
+                    foundRoles.forEach(item => {
+                        console.log(`  • ${item.role} → <${item.element}> (id: ${item.id}, class: ${item.className})`);
+                    });
+                }
+                
+                if (missingRoles.length > 0) {
+                    console.warn('❌ 未找到的 data-role:');
+                    missingRoles.forEach(role => {
+                        console.warn(`  • ${role}`);
+                    });
+                }
+                
+                console.log(`📈 统计: ${foundRoles.length}/${expectedRoles.length} 个角色已找到`);
+                console.groupEnd();
+                
+                return { foundRoles, missingRoles, total: expectedRoles.length };
+            }
+            
+            const auditResult = performRoleAudit();
+            
+            const success = auditResult.missingRoles.length === 0;
+            resultDiv.className = `test-result ${success ? 'success' : 'error'}`;
+            resultDiv.innerHTML = `
+                <strong>ROLE-AUDIT 测试结果:</strong><br>
+                找到: ${auditResult.foundRoles.length} 个<br>
+                缺失: ${auditResult.missingRoles.length} 个<br>
+                总计: ${auditResult.total} 个<br>
+                <em>详细信息请查看控制台输出</em>
+            `;
+        }
+        
+        // 页面加载完成后自动运行测试
+        window.addEventListener('DOMContentLoaded', function() {
+            console.log('🎯 Data-Role 测试页面已加载');
+            console.log('请点击测试按钮运行各项测试');
+        });
+    </script>
+</body>
+</html>

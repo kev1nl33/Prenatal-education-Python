@@ -5,6 +5,7 @@ import urllib.request
 import base64
 import uuid
 import time
+import logging
 from urllib.error import HTTPError
 from urllib.parse import parse_qs
 from http.server import BaseHTTPRequestHandler
@@ -24,6 +25,10 @@ from services import (
 )
 from services.costbook import get_cost_book
 from services.cache import get_tts_cache
+from services.logger_setup import truncate_and_sample
+
+# 获取日志记录器
+logger = logging.getLogger(__name__)
 
 
 def _build_ssl_ctx():
@@ -305,16 +310,16 @@ class handler(BaseHTTPRequestHandler):
             
             # 提取参数
             action = data.get("action", "upload")  # upload, status, list
-            speaker_id = data.get("speaker_id", "").strip()
+            speaker_name = data.get("speaker_id", "").strip() # 用户输入的名字，仅用于显示
             audio_data = data.get("audio_data", "")  # base64编码的音频数据
             audio_format = data.get("audio_format", "wav")  # 音频格式
             language = data.get("language", "zh")  # 语言
             model_type = data.get("model_type", 1)  # 1=ICL, 2=DiT标准版, 3=DiT还原版
             dry_run_param = data.get("dry_run", False)
-            
+
             # 检查是否为干跑模式
             is_dry_run_mode = is_dry_run() or dry_run_param
-            
+
             # 根据action处理不同请求
             if action == "upload":
                 # 音频上传和声音复刻
@@ -332,11 +337,12 @@ class handler(BaseHTTPRequestHandler):
                     }
                     self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
                     return
-                
-                # 生成speaker_id如果未提供
-                if not speaker_id:
-                    speaker_id = f"speaker_{int(time.time() * 1000)}"
-                
+
+                # 核心修复：不再使用用户输入作为speaker_id，而是生成一个唯一的、符合规范的ID
+                # 用户输入的名字(speaker_name)仅用于前端显示，不由API使用
+                speaker_id = f"s_{uuid.uuid4().hex[:16]}"
+                logger.info(f"New speaker_id generated: {speaker_id} for name: {speaker_name}")
+
                 try:
                     # 验证音频数据是否为有效的base64
                     audio_bytes = base64.b64decode(audio_data)
@@ -362,12 +368,19 @@ class handler(BaseHTTPRequestHandler):
                     speech_service = get_speech_service()
                     current_mode = get_current_mode()
                     
-                    print(f"[VOICE_CLONE DEBUG] Current mode: {current_mode}")
-                    print(f"[VOICE_CLONE DEBUG] Speaker ID: {speaker_id}")
-                    print(f"[VOICE_CLONE DEBUG] Audio format: {audio_format}")
-                    print(f"[VOICE_CLONE DEBUG] Language: {language}")
-                    print(f"[VOICE_CLONE DEBUG] Model type: {model_type}")
-                    print(f"[VOICE_CLONE DEBUG] Audio size: {len(audio_bytes)} bytes")
+                    # 使用结构化日志记录详细的调试信息
+                    logger.debug(
+                        "Voice clone request details",
+                        extra={
+                            "request_id": request_id,
+                            "mode": current_mode,
+                            "speaker_id": speaker_id,
+                            "audio_format": audio_format,
+                            "language": language,
+                            "model_type": model_type,
+                            "audio_info": truncate_and_sample(audio_bytes, field_name="audio")
+                        }
+                    )
                     
                 except ValueError as e:
                     cors_headers = _get_cors_headers(request_id=request_id, mode=mode)
@@ -393,7 +406,7 @@ class handler(BaseHTTPRequestHandler):
                 try:
                     cost_estimated = 0.1  # 声音复刻基础费用
                 except Exception as e:
-                    print(f"Warning: Failed to estimate cost: {e}")
+                    logger.warning(f"Failed to estimate cost: {e}", exc_info=True)
                     cost_estimated = 0.1
                 
                 # 检查每日费用限制
