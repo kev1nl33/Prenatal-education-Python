@@ -2,15 +2,12 @@ import os
 import json
 import time
 import random
-import urllib.request
-import urllib.error
-import ssl
+import httpx
 import base64
 import uuid
 from datetime import datetime
 from collections import deque
 from typing import Dict, Any, List, Optional
-from collections import deque
 from .base import SpeechSynthesizer
 
 class ProductionSpeechAdapter(SpeechSynthesizer):
@@ -30,23 +27,19 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
         self.voice_clone_status_url = f"{vc_base_url}/status"
 
         # --- 可配置参数 ---
-        self.timeout_ms = int(os.environ.get('TTS_MAX_WAIT_MS', '30000'))
+        self.timeout_ms = int(os.environ.get('TTS_MAX_WAIT_MS', '60000')) # Increased to 60s
         self.poll_interval_ms = int(os.environ.get('TTS_POLL_INTERVAL_MS', '1000'))
         self.backoff_factor = float(os.environ.get('TTS_BACKOFF_FACTOR', '1.5'))
         
+        # --- httpx Client ---
+        self.http_client = httpx.Client(timeout=(self.timeout_ms / 1000))
+
         print("-" * 50)
         print("TTS Adapter Configuration:")
         print(f"  - Max Wait: {self.timeout_ms}ms")
         print(f"  - Poll Interval: {self.poll_interval_ms}ms")
         print(f"  - Backoff Factor: {self.backoff_factor}")
         print("-" * 50)
-
-    def _build_ssl_context(self):
-        try:
-            import certifi
-            return ssl.create_default_context(cafile=certifi.where())
-        except Exception:
-            return ssl._create_unverified_context()
 
     def synthesize(self, text: str, voice_type: str = "default", quality: str = "draft", **kwargs) -> tuple[bytes, dict]:
         job_id = f"tts-job-{uuid.uuid4().hex[:12]}"
@@ -116,18 +109,15 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
         debug_log["steps"].append(submit_step)
         
         submit_start_time = time.time()
-        req_data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(self.api_url, data=req_data, headers=headers)
-        ctx = self._build_ssl_context()
 
         try:
-            with urllib.request.urlopen(req, timeout=(self.timeout_ms / 1000), context=ctx) as response:
-                submit_step["first_packet_latency_s"] = round(time.time() - submit_start_time, 3)
-                response_data = response.read()
-                json_response = json.loads(response_data.decode("utf-8"))
-                submit_step["http_status"] = response.getcode()
-                submit_step["response_body"] = json_response
-        except urllib.error.HTTPError as e:
+            response = self.http_client.post(self.api_url, json=payload, headers=headers)
+            submit_step["first_packet_latency_s"] = round(time.time() - submit_start_time, 3)
+            response.raise_for_status() # Raise exception for 4xx/5xx
+            json_response = response.json()
+            submit_step["http_status"] = response.status_code
+            submit_step["response_body"] = json_response
+        except httpx.HTTPStatusError as e:
             self._classify_and_raise(e, "submit", submit_step)
         except Exception as e:
             submit_step["error"] = {"type": "NETWORK", "message": str(e)}
@@ -166,34 +156,31 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                 if payload["request"].get("resource_id"):
                     query_payload["request"]["resource_id"] = payload["request"]["resource_id"]
 
-                q_req_data = json.dumps(query_payload).encode("utf-8")
-                q_req = urllib.request.Request(self.api_url, data=q_req_data, headers=headers)
-
                 try:
-                    with urllib.request.urlopen(q_req, timeout=30, context=ctx) as q_response:
-                        poll_step["first_packet_latency_s"] = round(time.time() - poll_start_time, 3)
-                        q_resp_data = q_response.read()
-                        q_json = json.loads(q_resp_data.decode("utf-8"))
-                        poll_step["http_status"] = q_response.getcode()
-                        poll_step["response_body"] = q_json
-                        last_poll_responses.append(q_json)
+                    q_response = self.http_client.post(self.api_url, json=query_payload, headers=headers)
+                    poll_step["first_packet_latency_s"] = round(time.time() - poll_start_time, 3)
+                    q_response.raise_for_status()
+                    q_json = q_response.json()
+                    poll_step["http_status"] = q_response.status_code
+                    poll_step["response_body"] = q_json
+                    last_poll_responses.append(q_json)
 
-                        q_code = q_json.get("code")
-                        if q_code == 0:
-                            audio_base64 = q_json.get("data")
-                            if audio_base64 and isinstance(audio_base64, str):
-                                return base64.b64decode(audio_base64)
-                            # Still processing, no data yet, continue polling
-                        elif q_code in [3000, 3032]:
-                            # FIX: Check for data even with code 3000 (success with data)
-                            audio_base64 = q_json.get("data")
-                            if audio_base64 and isinstance(audio_base64, str):
-                                return base64.b64decode(audio_base64)
-                            # If no data, it's still processing, so continue polling
-                            pass 
-                        else:
-                            raise Exception(f"Polling failed with API Error ({q_code}): {q_json.get('message', 'Unknown')}")
-                except urllib.error.HTTPError as e:
+                    q_code = q_json.get("code")
+                    if q_code == 0:
+                        audio_base64 = q_json.get("data")
+                        if audio_base64 and isinstance(audio_base64, str):
+                            return base64.b64decode(audio_base64)
+                        # Still processing, no data yet, continue polling
+                    elif q_code in [3000, 3032]:
+                        # FIX: Check for data even with code 3000 (success with data)
+                        audio_base64 = q_json.get("data")
+                        if audio_base64 and isinstance(audio_base64, str):
+                            return base64.b64decode(audio_base64)
+                        # If no data, it's still processing, so continue polling
+                        pass 
+                    else:
+                        raise Exception(f"Polling failed with API Error ({q_code}): {q_json.get('message', 'Unknown')}")
+                except httpx.HTTPStatusError as e:
                     self._classify_and_raise(e, "poll", poll_step, list(last_poll_responses))
                 except Exception as e:
                     poll_step["error"] = {"type": "NETWORK", "message": str(e)}
@@ -205,9 +192,9 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
         else:
             raise Exception(f"API Error ({code}): {json_response.get('message', 'Unknown')}")
 
-    def _classify_and_raise(self, error: urllib.error.HTTPError, action: str, step: dict, history: list = None):
-        status = error.code
-        error_body = error.read().decode('utf-8') if error.fp else str(error)
+    def _classify_and_raise(self, error: httpx.HTTPStatusError, action: str, step: dict, history: list = None):
+        status = error.response.status_code
+        error_body = error.response.text
         error_type = "UNKNOWN"
         if 401 <= status <= 403: error_type = "AUTH"
         elif status == 429: error_type = "RATE_LIMIT"
@@ -219,10 +206,8 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
             step["error"]["history"] = history
         raise Exception(f"{error_type} error during {action}: {error_body}")
 
-    # ... (voice_clone, get_voice_clone_status, etc. remain unchanged but will use the new credentials via self.app_id etc.)
     def voice_clone(self, speaker_id: str, audio_data: bytes, audio_format: str = "wav", 
                    language: str = "zh", model_type: int = 1, **kwargs) -> Dict[str, Any]:
-        # This method now uses the same high-permission credentials
         try:
             payload = {
                 "appid": self.app_id,
@@ -233,52 +218,47 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                 "model_type": model_type,
                 "extra_params": json.dumps(kwargs.get("extra_params", {}))
             }
-            req_data = json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(
-                self.voice_clone_upload_url, data=req_data,
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer;{self.access_token}",
-                    "Resource-Id": "volc.megatts.voiceclone"
-                }
-            )
-            ctx = self._build_ssl_context()
-            with urllib.request.urlopen(req, timeout=(self.timeout_ms / 1000), context=ctx) as response:
-                json_response = json.loads(response.read().decode("utf-8"))
-                base_resp = json_response.get("BaseResp", {})
-                if base_resp.get("StatusCode") == 0:
-                    return {"success": True, "speaker_id": speaker_id, "status": "submitted", "message": base_resp.get("StatusMessage", "")}
-                raise Exception(base_resp.get("StatusMessage", "Unknown error"))
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer;{self.access_token}",
+                "Resource-Id": "volc.megatts.voiceclone"
+            }
+            
+            response = self.http_client.post(self.voice_clone_upload_url, json=payload, headers=headers)
+            response.raise_for_status()
+            json_response = response.json()
+
+            base_resp = json_response.get("BaseResp", {})
+            if base_resp.get("StatusCode") == 0:
+                return {"success": True, "speaker_id": speaker_id, "status": "submitted", "message": base_resp.get("StatusMessage", "")}
+            raise Exception(base_resp.get("StatusMessage", "Unknown error"))
         except Exception as e:
             return {"success": False, "error": f"Voice clone upload failed: {str(e)}"}
     
     def get_voice_clone_status(self, speaker_id: str, **kwargs) -> Dict[str, Any]:
-        # This method now uses the same high-permission credentials
         try:
             payload = {"appid": self.app_id, "speaker_id": speaker_id}
-            req_data = json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(
-                self.voice_clone_status_url, data=req_data,
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer;{self.access_token}",
-                    "Resource-Id": "volc.megatts.voiceclone"
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer;{self.access_token}",
+                "Resource-Id": "volc.megatts.voiceclone"
+            }
+
+            response = self.http_client.post(self.voice_clone_status_url, json=payload, headers=headers)
+            response.raise_for_status()
+            json_response = response.json()
+
+            base_resp = json_response.get("BaseResp", {})
+            if base_resp.get("StatusCode") == 0:
+                status_map = {0: "not_found", 1: "training", 2: "success", 3: "failed", 4: "active"}
+                status_val = json_response.get("status")
+                return {
+                    "success": True, "speaker_id": speaker_id,
+                    "status": status_map.get(status_val, "unknown"),
+                    "progress": 100 if status_val in (2, 4) else 50 if status_val == 1 else 0,
+                    "message": base_resp.get("StatusMessage", "")
                 }
-            )
-            ctx = self._build_ssl_context()
-            with urllib.request.urlopen(req, timeout=(self.timeout_ms / 1000), context=ctx) as response:
-                json_response = json.loads(response.read().decode("utf-8"))
-                base_resp = json_response.get("BaseResp", {})
-                if base_resp.get("StatusCode") == 0:
-                    status_map = {0: "not_found", 1: "training", 2: "success", 3: "failed", 4: "active"}
-                    status_val = json_response.get("status")
-                    return {
-                        "success": True, "speaker_id": speaker_id,
-                        "status": status_map.get(status_val, "unknown"),
-                        "progress": 100 if status_val in (2, 4) else 50 if status_val == 1 else 0,
-                        "message": base_resp.get("StatusMessage", "")
-                    }
-                raise Exception(base_resp.get("StatusMessage", "Unknown error"))
+            raise Exception(base_resp.get("StatusMessage", "Unknown error"))
         except Exception as e:
             return {"success": False, "error": f"Status query failed: {str(e)}"}
 
