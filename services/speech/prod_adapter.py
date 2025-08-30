@@ -170,7 +170,7 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                 q_req = urllib.request.Request(self.api_url, data=q_req_data, headers=headers)
 
                 try:
-                    with urllib.request.urlopen(q_req, timeout=5, context=ctx) as q_response:
+                    with urllib.request.urlopen(q_req, timeout=30, context=ctx) as q_response:
                         poll_step["first_packet_latency_s"] = round(time.time() - poll_start_time, 3)
                         q_resp_data = q_response.read()
                         q_json = json.loads(q_resp_data.decode("utf-8"))
@@ -243,7 +243,7 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                 }
             )
             ctx = self._build_ssl_context()
-            with urllib.request.urlopen(req, timeout=self.timeout, context=ctx) as response:
+            with urllib.request.urlopen(req, timeout=(self.timeout_ms / 1000), context=ctx) as response:
                 json_response = json.loads(response.read().decode("utf-8"))
                 base_resp = json_response.get("BaseResp", {})
                 if base_resp.get("StatusCode") == 0:
@@ -266,7 +266,7 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                 }
             )
             ctx = self._build_ssl_context()
-            with urllib.request.urlopen(req, timeout=self.timeout, context=ctx) as response:
+            with urllib.request.urlopen(req, timeout=(self.timeout_ms / 1000), context=ctx) as response:
                 json_response = json.loads(response.read().decode("utf-8"))
                 base_resp = json_response.get("BaseResp", {})
                 if base_resp.get("StatusCode") == 0:

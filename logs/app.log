@@ -154,3 +154,189 @@ Shutting down server...
 2025-08-29 22:31:19 - api.tts - DEBUG - TTS synthesis successful
 2025-08-29 22:31:36 - root - INFO - 
 Shutting down server...
+2025-08-30 08:50:27 - root - INFO - ==================================================
+2025-08-30 08:50:27 - root - INFO - Logging Service Initialized
+2025-08-30 08:50:27 - root - INFO -   Console Log Level: INFO
+2025-08-30 08:50:27 - root - INFO -   File Log Level:    DEBUG
+2025-08-30 08:50:27 - root - INFO -   Log File:          logs/app.log
+2025-08-30 08:50:27 - root - INFO -   Rotation Size:     5 MB
+2025-08-30 08:50:27 - root - INFO -   Rotation Backups:  5
+2025-08-30 08:50:27 - root - INFO -   Max Line Length:   8192 bytes
+2025-08-30 08:50:27 - root - INFO -   Verbose Debug:     False
+2025-08-30 08:50:27 - root - INFO -   Long Log Chunks:   logs/chunks
+2025-08-30 08:50:27 - root - INFO - ==================================================
+2025-08-30 08:50:27 - root - INFO - Starting server on port 8000...
+2025-08-30 08:50:27 - root - INFO - Server running at http://localhost:8000/
+2025-08-30 08:50:34 - root - INFO - Routing POST /api/tts -> /api/tts
+2025-08-30 08:50:34 - api.tts - INFO - TTS request received for voice 'S_DrtguyIB1' with text length 10.
+2025-08-30 08:50:34 - api.tts - DEBUG - TTS request parameters
+2025-08-30 08:50:37 - api.tts - DEBUG - TTS synthesis successful
+2025-08-30 08:50:45 - root - INFO - Routing POST /api/tts -> /api/tts
+2025-08-30 08:50:45 - api.tts - INFO - TTS request received for voice 'S_DrtguyIB1' with text length 783.
+2025-08-30 08:50:45 - api.tts - DEBUG - TTS request parameters
+2025-08-30 08:50:51 - api.tts - ERROR - Unhandled exception in /api/tts
+Traceback (most recent call last):
+  File "/Users/liran/Documents/Github/Prenatal-education-Python/api/tts.py", line 74, in do_POST
+    audio_data, debug_log = speech_service.synthesize(
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/liran/Documents/Github/Prenatal-education-Python/services/speech/prod_adapter.py", line 99, in synthesize
+    audio_data = self._make_request_with_retry(payload, debug_log)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/liran/Documents/Github/Prenatal-education-Python/services/speech/prod_adapter.py", line 173, in _make_request_with_retry
+    with urllib.request.urlopen(q_req, timeout=5, context=ctx) as q_response:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/urllib/request.py", line 215, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/urllib/request.py", line 515, in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/urllib/request.py", line 532, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/urllib/request.py", line 492, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/urllib/request.py", line 1392, in https_open
+    return self.do_open(http.client.HTTPSConnection, req,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/urllib/request.py", line 1348, in do_open
+    r = h.getresponse()
+        ^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/http/client.py", line 1428, in getresponse
+    response.begin()
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/http/client.py", line 331, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/http/client.py", line 292, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/socket.py", line 707, in readinto
+    return self._sock.recv_into(b)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/ssl.py", line 1252, in recv_into
+    return self.read(nbytes, buffer)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/ssl.py", line 1104, in read
+    return self._sslobj.read(len, buffer)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TimeoutError: The read operation timed out
+2025-08-30 08:53:32 - root - INFO - 
+Shutting down server...
+2025-08-30 08:55:26 - root - INFO - ==================================================
+2025-08-30 08:55:26 - root - INFO - Logging Service Initialized
+2025-08-30 08:55:26 - root - INFO -   Console Log Level: INFO
+2025-08-30 08:55:26 - root - INFO -   File Log Level:    DEBUG
+2025-08-30 08:55:26 - root - INFO -   Log File:          logs/app.log
+2025-08-30 08:55:26 - root - INFO -   Rotation Size:     5 MB
+2025-08-30 08:55:26 - root - INFO -   Rotation Backups:  5
+2025-08-30 08:55:26 - root - INFO -   Max Line Length:   8192 bytes
+2025-08-30 08:55:26 - root - INFO -   Verbose Debug:     False
+2025-08-30 08:55:26 - root - INFO -   Long Log Chunks:   logs/chunks
+2025-08-30 08:55:26 - root - INFO - ==================================================
+2025-08-30 08:55:26 - root - INFO - Starting server on port 8000...
+2025-08-30 08:55:26 - root - INFO - Server running at http://localhost:8000/
+2025-08-30 08:55:38 - root - INFO - Routing POST /api/tts -> /api/tts
+2025-08-30 08:55:38 - api.tts - INFO - TTS request received for voice 'S_DrtguyIB1' with text length 10.
+2025-08-30 08:55:38 - api.tts - DEBUG - TTS request parameters
+2025-08-30 08:55:40 - api.tts - DEBUG - TTS synthesis successful
+2025-08-30 08:55:46 - root - INFO - Routing POST /api/tts -> /api/tts
+2025-08-30 08:55:46 - api.tts - INFO - TTS request received for voice 'S_DrtguyIB1' with text length 783.
+2025-08-30 08:55:46 - api.tts - DEBUG - TTS request parameters
+2025-08-30 08:56:03 - api.tts - ERROR - Unhandled exception in /api/tts
+Traceback (most recent call last):
+  File "/Users/liran/Documents/Github/Prenatal-education-Python/api/tts.py", line 74, in do_POST
+    audio_data, debug_log = speech_service.synthesize(
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/liran/Documents/Github/Prenatal-education-Python/services/speech/prod_adapter.py", line 99, in synthesize
+    audio_data = self._make_request_with_retry(payload, debug_log)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/liran/Documents/Github/Prenatal-education-Python/services/speech/prod_adapter.py", line 173, in _make_request_with_retry
+    with urllib.request.urlopen(q_req, timeout=15, context=ctx) as q_response:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/urllib/request.py", line 215, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/urllib/request.py", line 515, in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/urllib/request.py", line 532, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/urllib/request.py", line 492, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/urllib/request.py", line 1392, in https_open
+    return self.do_open(http.client.HTTPSConnection, req,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/urllib/request.py", line 1348, in do_open
+    r = h.getresponse()
+        ^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/http/client.py", line 1428, in getresponse
+    response.begin()
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/http/client.py", line 331, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/http/client.py", line 292, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/socket.py", line 707, in readinto
+    return self._sock.recv_into(b)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/ssl.py", line 1252, in recv_into
+    return self.read(nbytes, buffer)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/ssl.py", line 1104, in read
+    return self._sslobj.read(len, buffer)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TimeoutError: The read operation timed out
+2025-08-30 08:58:20 - root - INFO - 
+Shutting down server...
+2025-08-30 08:58:21 - root - INFO - ==================================================
+2025-08-30 08:58:21 - root - INFO - Logging Service Initialized
+2025-08-30 08:58:21 - root - INFO -   Console Log Level: INFO
+2025-08-30 08:58:21 - root - INFO -   File Log Level:    DEBUG
+2025-08-30 08:58:21 - root - INFO -   Log File:          logs/app.log
+2025-08-30 08:58:21 - root - INFO -   Rotation Size:     5 MB
+2025-08-30 08:58:21 - root - INFO -   Rotation Backups:  5
+2025-08-30 08:58:21 - root - INFO -   Max Line Length:   8192 bytes
+2025-08-30 08:58:21 - root - INFO -   Verbose Debug:     False
+2025-08-30 08:58:21 - root - INFO -   Long Log Chunks:   logs/chunks
+2025-08-30 08:58:21 - root - INFO - ==================================================
+2025-08-30 08:58:21 - root - INFO - Starting server on port 8000...
+2025-08-30 08:58:21 - root - INFO - Server running at http://localhost:8000/
+2025-08-30 08:58:29 - root - INFO - Routing POST /api/tts -> /api/tts
+2025-08-30 08:58:29 - api.tts - INFO - TTS request received for voice 'S_DrtguyIB1' with text length 10.
+2025-08-30 08:58:29 - api.tts - DEBUG - TTS request parameters
+2025-08-30 08:58:31 - api.tts - DEBUG - TTS synthesis successful
+2025-08-30 08:58:34 - root - INFO - Routing POST /api/tts -> /api/tts
+2025-08-30 08:58:34 - api.tts - INFO - TTS request received for voice 'S_DrtguyIB1' with text length 783.
+2025-08-30 08:58:34 - api.tts - DEBUG - TTS request parameters
+2025-08-30 08:59:05 - api.tts - DEBUG - TTS synthesis successful
+2025-08-30 09:05:01 - root - INFO - 
+Shutting down server...
+2025-08-30 09:26:32 - root - INFO - ==================================================
+2025-08-30 09:26:32 - root - INFO - Logging Service Initialized
+2025-08-30 09:26:32 - root - INFO -   Console Log Level: INFO
+2025-08-30 09:26:32 - root - INFO -   File Log Level:    DEBUG
+2025-08-30 09:26:32 - root - INFO -   Log File:          logs/app.log
+2025-08-30 09:26:32 - root - INFO -   Rotation Size:     5 MB
+2025-08-30 09:26:32 - root - INFO -   Rotation Backups:  5
+2025-08-30 09:26:32 - root - INFO -   Max Line Length:   8192 bytes
+2025-08-30 09:26:32 - root - INFO -   Verbose Debug:     False
+2025-08-30 09:26:32 - root - INFO -   Long Log Chunks:   logs/chunks
+2025-08-30 09:26:32 - root - INFO - ==================================================
+2025-08-30 09:26:32 - root - INFO - Starting server on port 8000...
+2025-08-30 09:26:32 - root - INFO - Server running at http://localhost:8000/
+2025-08-30 09:26:38 - root - INFO - Routing POST /api/tts -> /api/tts
+2025-08-30 09:26:38 - api.tts - INFO - TTS request received for voice 'S_DrtguyIB1' with text length 10.
+2025-08-30 09:26:38 - api.tts - DEBUG - TTS request parameters
+2025-08-30 09:26:41 - api.tts - DEBUG - TTS synthesis successful
+2025-08-30 09:27:53 - root - INFO - Routing POST /api/tts -> /api/tts
+2025-08-30 09:27:53 - api.tts - INFO - TTS request received for voice 'S_DrtguyIB1' with text length 10.
+2025-08-30 09:27:53 - api.tts - DEBUG - TTS request parameters
+2025-08-30 09:27:55 - api.tts - DEBUG - TTS synthesis successful
+2025-08-30 09:27:57 - root - INFO - Routing POST /api/tts -> /api/tts
+2025-08-30 09:27:57 - api.tts - INFO - TTS request received for voice 'S_DrtguyIB1' with text length 783.
+2025-08-30 09:27:57 - api.tts - DEBUG - TTS request parameters
+2025-08-30 09:28:27 - api.tts - DEBUG - TTS synthesis successful
