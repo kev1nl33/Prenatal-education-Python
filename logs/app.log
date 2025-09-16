@@ -340,3 +340,31 @@ Shutting down server...
 2025-08-30 09:27:57 - api.tts - INFO - TTS request received for voice 'S_DrtguyIB1' with text length 783.
 2025-08-30 09:27:57 - api.tts - DEBUG - TTS request parameters
 2025-08-30 09:28:27 - api.tts - DEBUG - TTS synthesis successful
+2025-09-16 11:08:16 - root - INFO - ==================================================
+2025-09-16 11:08:16 - root - INFO - Logging Service Initialized
+2025-09-16 11:08:16 - root - INFO -   Console Log Level: INFO
+2025-09-16 11:08:16 - root - INFO -   File Log Level:    DEBUG
+2025-09-16 11:08:16 - root - INFO -   Log File:          logs/app.log
+2025-09-16 11:08:16 - root - INFO -   Rotation Size:     5 MB
+2025-09-16 11:08:16 - root - INFO -   Rotation Backups:  5
+2025-09-16 11:08:16 - root - INFO -   Max Line Length:   8192 bytes
+2025-09-16 11:08:16 - root - INFO -   Verbose Debug:     False
+2025-09-16 11:08:16 - root - INFO -   Long Log Chunks:   logs/chunks
+2025-09-16 11:08:16 - root - INFO - ==================================================
+2025-09-16 11:08:16 - root - INFO - Starting server on port 8000...
+2025-09-16 11:08:16 - root - INFO - Server running at http://localhost:8000/
+2025-09-16 11:10:23 - root - INFO - 
+Shutting down server...
+2025-09-16 11:10:24 - root - INFO - ==================================================
+2025-09-16 11:10:24 - root - INFO - Logging Service Initialized
+2025-09-16 11:10:24 - root - INFO -   Console Log Level: INFO
+2025-09-16 11:10:24 - root - INFO -   File Log Level:    DEBUG
+2025-09-16 11:10:24 - root - INFO -   Log File:          logs/app.log
+2025-09-16 11:10:24 - root - INFO -   Rotation Size:     5 MB
+2025-09-16 11:10:24 - root - INFO -   Rotation Backups:  5
+2025-09-16 11:10:24 - root - INFO -   Max Line Length:   8192 bytes
+2025-09-16 11:10:24 - root - INFO -   Verbose Debug:     False
+2025-09-16 11:10:24 - root - INFO -   Long Log Chunks:   logs/chunks
+2025-09-16 11:10:24 - root - INFO - ==================================================
+2025-09-16 11:10:24 - root - INFO - Starting server on port 8000...
+2025-09-16 11:10:24 - root - INFO - Server running at http://localhost:8000/

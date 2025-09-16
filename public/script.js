@@ -998,6 +998,81 @@ async function init() {
   updateVoiceStatusDisplay();
 }
 
+// 显示开发中提示对话框
+function showDevelopmentAlert(message) {
+  // 创建遮罩层
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  `;
+  
+  // 创建提示框
+  const dialog = document.createElement('div');
+  dialog.style.cssText = `
+    background: white;
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-width: 450px;
+    width: 90%;
+    text-align: center;
+    position: relative;
+  `;
+  
+  dialog.innerHTML = `
+    <div style="font-size: 48px; margin-bottom: 16px;">🚧</div>
+    <h2 style="margin: 0 0 16px 0; color: #333; font-size: 24px; font-weight: 600;">功能开发中</h2>
+    <p style="margin: 0 0 24px 0; color: #666; line-height: 1.6; white-space: pre-line;">${message}</p>
+    <button id="developmentOkBtn" style="
+      background: linear-gradient(135deg, #4CAF50, #45a049);
+      color: white;
+      border: none;
+      padding: 12px 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    ">我知道了</button>
+  `;
+  
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+  
+  const okBtn = dialog.querySelector('#developmentOkBtn');
+  
+  // 关闭对话框
+  function closeDialog() {
+    document.body.removeChild(overlay);
+  }
+  
+  // 事件监听
+  okBtn.addEventListener('click', closeDialog);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      closeDialog();
+    }
+  });
+  
+  // 按ESC键关闭
+  const handleEscape = (e) => {
+    if (e.key === 'Escape') {
+      closeDialog();
+      document.removeEventListener('keydown', handleEscape);
+    }
+  };
+  document.addEventListener('keydown', handleEscape);
+}
+
 // 初始化内容卡片
 function initContentCards() {
   // 设置默认选中的卡片
@@ -1016,6 +1091,17 @@ function initContentCards() {
 
 // 选择内容卡片
 function selectContentCard(selectedCard) {
+  // 检查是否为禁用的卡片
+  if (selectedCard.classList.contains('disabled')) {
+    const contentType = selectedCard.getAttribute('data-type');
+    
+    // 显示开发中提示
+    if (contentType === 'music') {
+      showDevelopmentAlert('音乐引导功能正在开发中，敬请期待！\n\n我们正在努力为您打造更好的音乐引导体验，包括：\n• 专业的胎教音乐库\n• 个性化音乐推荐\n• 智能节拍调节\n\n请先体验其他精彩功能。');
+    }
+    return; // 阻止选择禁用的卡片
+  }
+
   // 移除所有卡片的选中状态
   el.contentCards.forEach(card => {
     card.classList.remove('selected');
