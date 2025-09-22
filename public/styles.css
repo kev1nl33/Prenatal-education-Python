@@ -407,11 +407,90 @@ input:focus, select:focus, textarea:focus { border-color: #93C5FD; box-shadow: 0
 }
 
 /* 音频播放器样式 */
-.audio-player { 
-  display: flex; 
-  align-items: center; 
-  gap: 12px; 
-  flex-wrap: wrap;
+.audio-player {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.audio-player audio {
+  width: 100%;
+  border-radius: 8px;
+}
+
+/* 播放列表控制器样式 */
+#playlistControls {
+  margin-top: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.playlist-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+#segmentInfo {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+}
+
+.playlist-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.playlist-buttons .btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  min-height: auto;
+}
+
+.playlist-buttons .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 自动播放控制样式 */
+.playlist-controls {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.auto-play-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+  user-select: none;
+}
+
+.auto-play-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #4CAF50;
+  cursor: pointer;
+}
+
+.auto-play-toggle:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.toggle-text {
+  font-weight: 500;
 }
 
 .history-list { display: grid; gap: 10px; }

@@ -224,7 +224,7 @@ class handler(BaseHTTPRequestHandler):
                     {"role": "system", "content": "你是一个专业的胎教内容创作助手，擅长生成温馨、积极、有益的胎教内容。"},
                     {"role": "user", "content": prompt}
                 ],
-                "max_tokens": 2000,
+                "max_tokens": 5000,
                 "temperature": 0.7
             }
             

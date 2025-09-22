@@ -814,6 +814,101 @@ async function fetchWithTimeoutAndRetry(url, options, timeout = 60000, maxRetrie
   }
 }
 
+// 文本分段处理函数
+function segmentText(text, maxLength = 800) {
+  if (!text || text.length <= maxLength) {
+    return [text];
+  }
+  
+  const segments = [];
+  const sentences = text.split(/[。！？；\n]/);
+  let currentSegment = '';
+  
+  for (let sentence of sentences) {
+    sentence = sentence.trim();
+    if (!sentence) continue;
+    
+    // 如果单个句子就超过最大长度，强制分割
+    if (sentence.length > maxLength) {
+      if (currentSegment) {
+        segments.push(currentSegment.trim());
+        currentSegment = '';
+      }
+      // 按逗号分割长句子
+      const parts = sentence.split('，');
+      let tempSegment = '';
+      for (let part of parts) {
+        if ((tempSegment + part).length > maxLength) {
+          if (tempSegment) {
+            segments.push(tempSegment.trim());
+          }
+          tempSegment = part;
+        } else {
+          tempSegment += (tempSegment ? '，' : '') + part;
+        }
+      }
+      if (tempSegment) {
+        segments.push(tempSegment.trim());
+      }
+      continue;
+    }
+    
+    // 检查添加当前句子是否会超过长度限制
+    const testSegment = currentSegment + (currentSegment ? '。' : '') + sentence;
+    if (testSegment.length > maxLength && currentSegment) {
+      segments.push(currentSegment.trim());
+      currentSegment = sentence;
+    } else {
+      currentSegment = testSegment;
+    }
+  }
+  
+  if (currentSegment.trim()) {
+    segments.push(currentSegment.trim());
+  }
+  
+  return segments.filter(seg => seg.length > 0);
+}
+
+// 分段TTS合成函数
+async function synthesizeSegmentedText(text, voiceType, emotion = 'neutral', quality = 'draft', onProgress = null) {
+  const segments = segmentText(text, 800); // 800字符为一段
+  console.log(`文本分为 ${segments.length} 段进行处理`);
+  
+  const audioSegments = [];
+  
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+    console.log(`正在处理第 ${i + 1}/${segments.length} 段，长度: ${segment.length} 字符`);
+    
+    if (onProgress) {
+      onProgress(i + 1, segments.length, `正在生成第 ${i + 1}/${segments.length} 段语音...`);
+    }
+    
+    try {
+      const payload = {
+        text: segment,
+        voice_type: voiceType,
+        emotion: emotion,
+        quality: quality
+      };
+      
+      const data = await ttsSynthesize(payload);
+      audioSegments.push(data);
+      
+      // 段间延迟，避免请求过于频繁
+      if (i < segments.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    } catch (error) {
+      console.error(`第 ${i + 1} 段处理失败:`, error);
+      throw new Error(`第 ${i + 1} 段语音生成失败: ${error.message}`);
+    }
+  }
+  
+  return audioSegments;
+}
+
 async function ttsSynthesize(payload) {
   try {
     // 检查是否为测试模式
@@ -852,7 +947,10 @@ const state = {
   lastAudioBlob: null,
   lastAudioUrl: null, // 添加URL跟踪
   lastPreviewUrl: null, // 试听音频URL跟踪
-  history: storage.get('ve_history', [])
+  history: storage.get('ve_history', []),
+  audioPlaylist: null, // 音频播放列表
+  currentSegmentIndex: 0, // 当前播放段落索引
+  autoPlay: storage.get('ve_auto_play', true) // 自动播放下一段开关
 };
 
 // DOM 元素
@@ -1458,6 +1556,13 @@ document.addEventListener('keydown', (e) => {
 // 配置保存逻辑已移除，所有配置现在由后端托管
 
 // 生成胎教内容
+// 清理文本中的井号字符，避免朗读时听到"井号"发音
+function cleanTextForReading(text) {
+  if (!text) return text;
+  // 移除markdown标题格式的井号
+  return text.replace(/^#{1,6}\s*/gm, '').trim();
+}
+
 el.generateContent.addEventListener('click', async() => {
   const prompt = buildPrompt();
   setLoading(el.generateContent, true);
@@ -1465,9 +1570,11 @@ el.generateContent.addEventListener('click', async() => {
     const model = (state.modelEndpoint && state.modelEndpoint.trim()) ? state.modelEndpoint.trim() : 'doubao-1.5-pro-32k-250115';
     const data = await arkGenerate(prompt, model);
     const text = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : '';
-    state.lastContent = text;
-    el.contentText.textContent = text;
-    checkTextLength(text); // 检查文本长度并显示/隐藏展开按钮
+    // 清理文本中的井号字符
+    const cleanedText = cleanTextForReading(text);
+    state.lastContent = cleanedText;
+    el.contentText.textContent = cleanedText;
+    checkTextLength(cleanedText); // 检查文本长度并显示/隐藏展开按钮
     el.resultSection.style.display = 'block';
     el.audioPlayer.style.display = 'none';
     
@@ -1559,36 +1666,72 @@ el.generateAudio.addEventListener('click', async() => {
     showError('请先生成文本内容');
     return;
   }
+  
+  const textLength = state.lastContent.length;
+  const voiceType = state.voiceType || 'zh_female_roumeinvyou_emo_v2_mars_bigtts';
+  const emotion = el.mood.value || 'neutral';
+  
   setLoading(el.generateAudio, true);
+  
   try {
-    const payload = {
-      text: state.lastContent,
-      voice_type: state.voiceType || 'zh_female_roumeinvyou_emo_v2_mars_bigtts',
-      emotion: el.mood.value || 'neutral',
-      quality: 'draft'
-    };
+    // 如果文本较短（小于800字符），使用原有的单次请求方式
+    if (textLength <= 800) {
+      console.log(`文本长度 ${textLength} 字符，使用单次请求模式`);
+      const payload = {
+        text: state.lastContent,
+        voice_type: voiceType,
+        emotion: emotion,
+        quality: 'draft'
+      };
 
-    const response = await fetch(`${API_BASE}/api/tts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Auth-Token': await getAuthTokenAsync() },
-        body: JSON.stringify(payload)
-    });
-    const parsed = await parseTtsFetchResponse(response);
+      const response = await fetch(`${API_BASE}/api/tts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Auth-Token': await getAuthTokenAsync() },
+          body: JSON.stringify(payload)
+      });
+      const parsed = await parseTtsFetchResponse(response);
 
-    if (state.lastAudioUrl) URL.revokeObjectURL(state.lastAudioUrl);
-    
-    state.lastAudioBlob = parsed.blob;
-    state.lastAudioUrl = parsed.audioUrl;
-    
-    el.audioElement.src = parsed.audioUrl;
-    el.audioPlayer.style.display = 'flex';
-    el.audioElement.load();
-    showSuccess(`语音生成成功！当前语音：${getVoiceTypeName(payload.voice_type)}`);
+      if (state.lastAudioUrl) URL.revokeObjectURL(state.lastAudioUrl);
+      
+      state.lastAudioBlob = parsed.blob;
+      state.lastAudioUrl = parsed.audioUrl;
+      
+      el.audioElement.src = parsed.audioUrl;
+      el.audioPlayer.style.display = 'flex';
+      el.audioElement.load();
+      showSuccess(`语音生成成功！当前语音：${getVoiceTypeName(payload.voice_type)}`);
+    } else {
+      // 长文本使用分段处理
+      console.log(`文本长度 ${textLength} 字符，使用分段处理模式`);
+      
+      const audioSegments = await synthesizeSegmentedText(
+        state.lastContent,
+        voiceType,
+        emotion,
+        'draft',
+        (current, total, message) => {
+          const btn = el.generateAudio.querySelector('.btn-text');
+          if (btn) {
+            btn.textContent = message;
+          }
+        }
+      );
+      
+      // 创建音频播放列表
+      await createAudioPlaylist(audioSegments, voiceType);
+      showSuccess(`长文本语音生成成功！共 ${audioSegments.length} 段，当前语音：${getVoiceTypeName(voiceType)}`);
+    }
 
   } catch (e) {
+    console.error('语音生成失败:', e);
     showError(`生成语音失败: ${e.message}`);
   } finally {
     setLoading(el.generateAudio, false);
+    // 恢复按钮文本
+    const btn = el.generateAudio.querySelector('.btn-text');
+    if (btn) {
+      btn.textContent = '生成语音';
+    }
   }
 });
 
@@ -1628,7 +1771,7 @@ function buildPrompt() {
     learning: '提供温和的认知启蒙内容，如颜色、形状、数字、字母等基础概念，用简单有趣的方式介绍，为胎宝宝的早期智力发展奠定基础'
   };
 
-  return `请以温柔、积极、安定的语气，面向孕妈妈，生成${typeMap[type]}。整体基调为“${moodMap[mood]}”，篇幅${durationMap[duration]}。要求：\n- 用词轻柔、避免刺激、避免负面暗示\n- 建议分为自然小段，便于朗读\n- 适当加入呼吸/放松/想象引导\n- 面向中文语境读者，使用简体中文`;
+  return `请以温柔、积极、安定的语气，面向孕妈妈，生成${typeMap[type]}。整体基调为"${moodMap[mood]}"，篇幅${durationMap[duration]}。要求：\n- 用词轻柔、避免刺激、避免负面暗示\n- 建议分为自然小段，便于朗读\n- 适当加入呼吸/放松/想象引导\n- 面向中文语境读者，使用简体中文\n- 请使用自然流畅的叙述格式，不要使用markdown标题格式（如#、##、###等）`;
 }
 
 
@@ -1704,9 +1847,11 @@ function renderHistory() {
   el.historyList.querySelectorAll('.reload-text').forEach(btn => {
     btn.addEventListener('click', () => {
       const text = btn.getAttribute('data-text');
-      state.lastContent = text;
-      el.contentText.textContent = text;
-      checkTextLength(text); // 检查文本长度并显示/隐藏展开按钮
+      // 清理文本中的井号字符
+      const cleanedText = cleanTextForReading(text);
+      state.lastContent = cleanedText;
+      el.contentText.textContent = cleanedText;
+      checkTextLength(cleanedText); // 检查文本长度并显示/隐藏展开按钮
       el.resultSection.style.display = 'block';
       el.audioPlayer.style.display = 'none';
       showSuccess('文本已载入，可以直接生成语音');
@@ -2731,93 +2876,206 @@ function setDefaultClonedVoice() {
   }
 })();
 
+// 创建音频播放列表
+async function createAudioPlaylist(audioSegments, voiceType) {
+  if (audioSegments.length === 1) {
+    // 单段音频，直接播放
+    const parsed = audioSegments[0];
+    if (state.lastAudioUrl) URL.revokeObjectURL(state.lastAudioUrl);
+    
+    state.lastAudioBlob = parsed.blob;
+    state.lastAudioUrl = parsed.audioUrl;
+    
+    el.audioElement.src = parsed.audioUrl;
+    el.audioPlayer.style.display = 'flex';
+    el.audioElement.load();
+    return;
+  }
+  
+  // 多段音频，创建播放列表
+  state.audioPlaylist = audioSegments.map(segment => ({
+    blob: segment.blob,
+    url: segment.audioUrl
+  }));
+  state.currentSegmentIndex = 0;
+  
+  // 播放第一段
+  playSegment(0);
+  
+  // 显示播放控制界面
+  el.audioPlayer.style.display = 'flex';
+  updatePlaylistUI();
+}
+
+// 播放指定段落
+function playSegment(index) {
+  if (!state.audioPlaylist || index >= state.audioPlaylist.length) return;
+  
+  const segment = state.audioPlaylist[index];
+  state.currentSegmentIndex = index;
+  
+  if (state.lastAudioUrl) URL.revokeObjectURL(state.lastAudioUrl);
+  
+  state.lastAudioBlob = segment.blob;
+  state.lastAudioUrl = segment.url;
+  
+  el.audioElement.src = segment.url;
+  el.audioElement.load();
+  
+  // 根据设置决定是否自动播放下一段
+  el.audioElement.onended = () => {
+    if (state.autoPlay && index + 1 < state.audioPlaylist.length) {
+      playSegment(index + 1);
+    }
+  };
+  
+  updatePlaylistUI();
+}
+
+// 更新播放列表UI
+function updatePlaylistUI() {
+  if (!state.audioPlaylist || state.audioPlaylist.length <= 1) return;
+  
+  // 如果还没有播放列表控制器，创建一个
+  let playlistControls = document.getElementById('playlistControls');
+  if (!playlistControls) {
+    playlistControls = document.createElement('div');
+    playlistControls.id = 'playlistControls';
+    playlistControls.innerHTML = `
+      <div class="playlist-info">
+        <span id="segmentInfo">第 1 段 / 共 1 段</span>
+        <div class="playlist-buttons">
+          <button id="prevSegment" class="btn btn-outline btn-sm">上一段</button>
+          <button id="nextSegment" class="btn btn-outline btn-sm">下一段</button>
+        </div>
+      </div>
+      <div class="playlist-controls">
+        <label class="auto-play-toggle">
+          <input type="checkbox" id="autoPlayToggle" ${state.autoPlay ? 'checked' : ''}>
+          <span class="toggle-text">🔄 自动播放下一段</span>
+        </label>
+      </div>
+    `;
+    el.audioPlayer.appendChild(playlistControls);
+    
+    // 绑定事件
+    document.getElementById('prevSegment').addEventListener('click', () => {
+      if (state.currentSegmentIndex > 0) {
+        playSegment(state.currentSegmentIndex - 1);
+      }
+    });
+    
+    document.getElementById('nextSegment').addEventListener('click', () => {
+      if (state.currentSegmentIndex < state.audioPlaylist.length - 1) {
+        playSegment(state.currentSegmentIndex + 1);
+      }
+    });
+    
+    // 绑定自动播放开关事件
+    document.getElementById('autoPlayToggle').addEventListener('change', (e) => {
+      state.autoPlay = e.target.checked;
+      storage.set('ve_auto_play', state.autoPlay);
+      console.log('自动播放设置已更新:', state.autoPlay ? '开启' : '关闭');
+    });
+  }
+  
+  // 更新显示信息
+  const segmentInfo = document.getElementById('segmentInfo');
+  const prevBtn = document.getElementById('prevSegment');
+  const nextBtn = document.getElementById('nextSegment');
+  
+  if (segmentInfo) {
+    segmentInfo.textContent = `第 ${state.currentSegmentIndex + 1} 段 / 共 ${state.audioPlaylist.length} 段`;
+  }
+  
+  if (prevBtn) {
+    prevBtn.disabled = state.currentSegmentIndex === 0;
+  }
+  
+  if (nextBtn) {
+    nextBtn.disabled = state.currentSegmentIndex === state.audioPlaylist.length - 1;
+  }
+}
+
 // 为历史记录项生成语音
 async function generateAudioForHistoryItem(text) {
   try {
-    const payload = {
-      text: text,
-      voice_type: state.voiceType || 'default',
-      quality: 'draft'
-    };
-
-    const data = await ttsSynthesize(payload);
-
-    // 根据火山引擎TTS文档，音频数据位于 data 字段中
-    let audioBase64;
-    if (data.data && typeof data.data === 'string') {
-      audioBase64 = data.data;
-    } else if (data.data && data.data.audio) {
-      audioBase64 = data.data.audio;
-    } else if (data.audio) {
-      audioBase64 = data.audio;
-    } else {
-      throw new Error('TTS返回格式异常：未找到音频数据');
-    }
-
-    const audioBytes = safeBase64ToBytes(audioBase64);
-    // Determine correct MIME type from bytes or response info
-    let mimeType = detectAudioMimeType(audioBytes, data.encoding);
-    const blob = new Blob([audioBytes], { type: mimeType });
+    // 清理文本中的井号字符
+    const cleanedText = cleanTextForReading(text);
+    const textLength = cleanedText.length;
+    const voiceType = state.voiceType || 'default';
     
-    // 清理旧的blob URL
-    if (state.lastAudioUrl) {
-      URL.revokeObjectURL(state.lastAudioUrl);
-    }
-    
-    state.lastAudioBlob = blob;
-    const url = URL.createObjectURL(blob);
-    state.lastAudioUrl = url;
-    
-    // 添加错误处理（含 WAV 回退）
-    el.audioElement.__veTriedFallback = false;
-    el.audioElement.onerror = async (e) => {
-      console.error('音频加载失败:', {
-        error: e,
-        src: el.audioElement.src,
-        blobSize: blob ? blob.size : 'unknown',
-        blobType: blob ? blob.type : 'unknown'
-      });
-      if (el.audioElement.__veTriedFallback) {
-        showError('音频播放失败，请重试');
-        return;
-      }
-      el.audioElement.__veTriedFallback = true;
-      try {
-        const wavUrl = await decodeAudioBytesToWavUrl(audioBytes, blob);
-        if (state.lastAudioUrl) URL.revokeObjectURL(state.lastAudioUrl);
-        state.lastAudioUrl = wavUrl;
-        el.audioElement.src = wavUrl;
-        el.audioElement.load();
-        console.log('已回退为 WAV 播放:', { from: 'webaudio', type: 'audio/wav', src: wavUrl });
-      } catch (fallbackErr) {
-        console.error('WAV 回退失败:', fallbackErr);
-        showError('音频播放失败（解码回退失败）');
-      }
-    };
-    
-    el.audioElement.onloadeddata = () => {
-      console.log('历史音频加载成功:', {
-        duration: el.audioElement.duration,
-        src: el.audioElement.src
-      });
-    };
-    
-    el.audioElement.src = url;
-    el.audioPlayer.style.display = 'flex';
-    el.audioElement.load();
+    if (textLength <= 800) {
+      // 短文本，单次请求
+      const payload = {
+        text: cleanedText,
+        voice_type: voiceType,
+        quality: 'draft'
+      };
 
-    // 将历史记录的文本设置为当前内容
-    state.lastContent = text;
-    el.contentText.textContent = text;
-    checkTextLength(text); // 检查文本长度并显示/隐藏展开按钮
-    el.resultSection.style.display = 'block';
+      const data = await ttsSynthesize(payload);
 
-    showSuccess('历史记录语音生成成功！');
-  } catch (e) {
-    console.error(e);
-    alert('生成语音失败：' + (e.message || '请稍后重试'));
-  }
-}
+       // 根据火山引擎TTS文档，音频数据位于 data 字段中
+       let audioBase64;
+       if (data.data && typeof data.data === 'string') {
+         audioBase64 = data.data;
+       } else if (data.data && data.data.audio) {
+         audioBase64 = data.data.audio;
+       } else if (data.audio) {
+         audioBase64 = data.audio;
+       } else {
+         throw new Error('TTS返回格式异常：未找到音频数据');
+       }
+
+       const audioBytes = safeBase64ToBytes(audioBase64);
+       let mimeType = detectAudioMimeType(audioBytes, data.encoding);
+       const blob = new Blob([audioBytes], { type: mimeType });
+       
+       if (state.lastAudioUrl) {
+         URL.revokeObjectURL(state.lastAudioUrl);
+       }
+       
+       state.lastAudioBlob = blob;
+       const url = URL.createObjectURL(blob);
+       state.lastAudioUrl = url;
+       
+       el.audioElement.src = url;
+       el.audioPlayer.style.display = 'flex';
+       el.audioElement.load();
+
+       state.lastContent = cleanedText;
+       el.contentText.textContent = cleanedText;
+       checkTextLength(cleanedText);
+       el.resultSection.style.display = 'block';
+
+       showSuccess('历史记录语音生成成功！');
+     } else {
+       // 长文本，使用分段处理
+       console.log(`历史记录长文本处理，长度: ${textLength} 字符`);
+       
+       const audioSegments = await synthesizeSegmentedText(
+         cleanedText,
+         voiceType,
+         'neutral',
+         'draft'
+       );
+       
+       await createAudioPlaylist(audioSegments, voiceType);
+       
+       state.lastContent = cleanedText;
+       el.contentText.textContent = cleanedText;
+       checkTextLength(cleanedText);
+       el.resultSection.style.display = 'block';
+
+       showSuccess(`历史记录长文本语音生成成功！共 ${audioSegments.length} 段`);
+     }
+   } catch (e) {
+     console.error(e);
+     alert('生成语音失败：' + (e.message || '请稍后重试'));
+   }
+ }
+
+
 
 // 扩展 voiceCloneEl 绑定新增的手动添加控件
 voiceCloneEl.existingSpeakerId = document.getElementById('existingSpeakerId');

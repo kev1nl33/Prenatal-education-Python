@@ -27,9 +27,10 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
         self.voice_clone_status_url = f"{vc_base_url}/status"
 
         # --- 可配置参数 ---
-        self.timeout_ms = int(os.environ.get('TTS_MAX_WAIT_MS', '60000')) # Increased to 60s
-        self.poll_interval_ms = int(os.environ.get('TTS_POLL_INTERVAL_MS', '1000'))
-        self.backoff_factor = float(os.environ.get('TTS_BACKOFF_FACTOR', '1.5'))
+        self.timeout_ms = int(os.environ.get('TTS_MAX_WAIT_MS', '120000')) # Increased to 120s for long text
+        self.poll_interval_ms = int(os.environ.get('TTS_POLL_INTERVAL_MS', '2000')) # Increased to 2s
+        self.backoff_factor = float(os.environ.get('TTS_BACKOFF_FACTOR', '1.2')) # Reduced backoff
+        self.max_poll_interval_ms = int(os.environ.get('TTS_MAX_POLL_INTERVAL_MS', '5000')) # Max 5s interval
         
         # --- httpx Client ---
         self.http_client = httpx.Client(timeout=(self.timeout_ms / 1000))
@@ -140,10 +141,15 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
             last_poll_responses = deque(maxlen=3)
             deadline = time.time() + (self.timeout_ms / 1000) - (time.time() - submit_start_time)
 
-            time.sleep(self.poll_interval_ms / 1000) # Initial wait
+            # 动态调整轮询间隔
+            current_poll_interval = self.poll_interval_ms
+            poll_count = 0
+            
+            time.sleep(current_poll_interval / 1000) # Initial wait
 
             while time.time() < deadline:
-                poll_step = {"action": "poll", "url": self.api_url, "reqid": reqid}
+                poll_count += 1
+                poll_step = {"action": "poll", "url": self.api_url, "reqid": reqid, "poll_count": poll_count}
                 debug_log["steps"].append(poll_step)
                 poll_start_time = time.time()
 
@@ -186,7 +192,14 @@ class ProductionSpeechAdapter(SpeechSynthesizer):
                     poll_step["error"] = {"type": "NETWORK", "message": str(e)}
                     raise
                 
-                time.sleep(self.poll_interval_ms / 1000)
+                # 动态调整轮询间隔：随着时间增加，间隔逐渐增大
+                if poll_count > 5:  # 5次轮询后开始增加间隔
+                    current_poll_interval = min(
+                        int(current_poll_interval * self.backoff_factor),
+                        self.max_poll_interval_ms
+                    )
+                
+                time.sleep(current_poll_interval / 1000)
 
             raise Exception(f"Polling timeout: Audio not ready in time. Last 3 responses: {list(last_poll_responses)}")
         else:
