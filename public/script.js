@@ -1701,6 +1701,10 @@ el.generateAudio.addEventListener('click', async() => {
       el.audioElement.src = parsed.audioUrl;
       el.audioPlayer.style.display = 'flex';
       el.audioElement.load();
+      el.audioElement.play().catch(err => {
+        console.warn('Audio autoplay blocked:', err);
+        showError('浏览器阻止了自动播放，请手动点击播放按钮。');
+      });
       showSuccess(`语音生成成功！当前语音：${getVoiceTypeName(payload.voice_type)}`);
     } else {
       // 长文本使用分段处理
@@ -2887,10 +2891,14 @@ async function createAudioPlaylist(audioSegments, voiceType) {
     
     state.lastAudioBlob = parsed.blob;
     state.lastAudioUrl = parsed.audioUrl;
-    
+  
     el.audioElement.src = parsed.audioUrl;
     el.audioPlayer.style.display = 'flex';
     el.audioElement.load();
+    el.audioElement.play().catch(err => {
+      console.warn('Audio autoplay blocked:', err);
+      showError('浏览器阻止了自动播放，请手动点击播放按钮。');
+    });
     return;
   }
   
@@ -2923,6 +2931,10 @@ function playSegment(index) {
   
   el.audioElement.src = segment.url;
   el.audioElement.load();
+  el.audioElement.play().catch(err => {
+    console.warn('Audio autoplay blocked:', err);
+    showError('浏览器阻止了自动播放，请手动点击播放按钮。');
+  });
   
   // 根据设置决定是否自动播放下一段
   el.audioElement.onended = () => {
