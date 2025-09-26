@@ -731,7 +731,7 @@ async function arkGenerate(prompt, model) {
     };
 
 
-    const response = await fetch(`${API_BASE}/api/ark`, {
+    const response = await fetch(`${API_BASE}/api/generate`, {
       method: 'POST',
       headers: headers,
       body: JSON.stringify({ prompt, model }),
