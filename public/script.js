@@ -568,6 +568,7 @@ async function generateMockTTS() {
 // 根据语音类型获取显示名称
 function getVoiceTypeName(voiceType) {
   const voiceNames = {
+    'zh_female_tianmeitaozi_mars_bigtts': '甜美桃子（多情感）',
     'zh_female_roumeinvyou_emo_v2_mars_bigtts': '柔美女友（多情感）',
     'zh_female_shuangkuaisisi_emo_v2_mars_bigtts': '爽快思思（多情感）',
     'ICL_zh_female_huoponvhai_tobzh_male_yangguangqingnian_emo_v2_mars_bigtts': '活泼女孩'
@@ -594,6 +595,7 @@ function getVoiceTypeName(voiceType) {
 // 根据语音类型获取不同的音调频率（用于备选音频生成）
 function getFrequencyByVoiceType(voiceType) {
   const frequencies = {
+    'zh_female_tianmeitaozi_mars_bigtts': 460,  // 中高音（甜美桃子）
     'zh_female_roumeinvyou_emo_v2_mars_bigtts': 440,  // 中音（柔美女友）
     'zh_female_shuangkuaisisi_emo_v2_mars_bigtts': 520, // 中高音（爽快思思）
     'ICL_zh_female_huoponvhai_tob': 330  // 活泼女孩
@@ -603,7 +605,7 @@ function getFrequencyByVoiceType(voiceType) {
 
 // 验证语音配置
 function validateVoiceConfiguration() {
-  const currentVoice = state.voiceType || 'zh_female_roumeinvyou_emo_v2_mars_bigtts';
+  const currentVoice = state.voiceType || 'zh_female_tianmeitaozi_mars_bigtts';
   const isClonedVoice = currentVoice && !currentVoice.startsWith('zh_');
   
   const validation = {
@@ -645,7 +647,7 @@ function validateVoiceConfiguration() {
 
 // 更新语音状态显示
 function updateVoiceStatusDisplay() {
-  const currentVoice = state.voiceType || 'zh_female_roumeinvyou_emo_v2_mars_bigtts';
+  const currentVoice = state.voiceType || 'zh_female_tianmeitaozi_mars_bigtts';
   const currentEmotion = el.mood.value || 'neutral';
   const voiceName = getVoiceTypeName(currentVoice);
   const emotionName = currentEmotion === 'happy' ? '开心' : '中性';
@@ -941,7 +943,7 @@ async function ttsSynthesize(payload) {
 // 全局状态
 const state = {
   // 移除API密钥配置，改为后端托管
-  voiceType: storage.get('ve_voice_type', 'zh_female_roumeinvyou_emo_v2_mars_bigtts'),
+  voiceType: storage.get('ve_voice_type', 'zh_female_tianmeitaozi_mars_bigtts'),
   testMode: storage.get('ve_test_mode', false),
   lastContent: '',
   lastAudioBlob: null,
@@ -1222,7 +1224,7 @@ function selectContentCard(selectedCard) {
 // 初始化语音选择器（下拉框）
 function initVoiceSelector() {
   // 设置当前选中的语音
-  el.voiceSelector.value = state.voiceType || 'zh_female_roumeinvyou_emo_v2_mars_bigtts';
+  el.voiceSelector.value = state.voiceType || 'zh_female_tianmeitaozi_mars_bigtts';
 
   // 添加change事件监听器
   el.voiceSelector.addEventListener('change', (e) => {
@@ -1303,7 +1305,7 @@ async function testCurrentVoiceSettings() {
   try {
     const payload = {
       text: randomText,
-      voice_type: state.voiceType || 'zh_female_roumeinvyou_emo_v2_mars_bigtts',
+      voice_type: state.voiceType || 'zh_female_tianmeitaozi_mars_bigtts',
       emotion: el.mood.value || 'neutral',
       quality: 'draft'
     };
@@ -1615,7 +1617,7 @@ async function previewContent() {
 
     const payload = {
       text: previewText,
-      voice_type: state.voiceType || 'zh_female_roumeinvyou_emo_v2_mars_bigtts',
+      voice_type: state.voiceType || 'zh_female_tianmeitaozi_mars_bigtts',
       emotion: el.mood.value || 'neutral',
       quality: 'draft'
     };
@@ -1668,7 +1670,7 @@ el.generateAudio.addEventListener('click', async() => {
   }
   
   const textLength = state.lastContent.length;
-  const voiceType = state.voiceType || 'zh_female_roumeinvyou_emo_v2_mars_bigtts';
+  const voiceType = state.voiceType || 'zh_female_tianmeitaozi_mars_bigtts';
   const emotion = el.mood.value || 'neutral';
   
   setLoading(el.generateAudio, true);
@@ -2725,7 +2727,7 @@ function deleteClonedVoice(speakerId) {
   
   // 如果当前选中的是被删除的声音，切换到默认声音
   if (state.voiceType === speakerId) {
-    state.voiceType = 'zh_female_roumeinvyou_emo_v2_mars_bigtts';
+    state.voiceType = 'zh_female_tianmeitaozi_mars_bigtts';
     el.voiceSelector.value = state.voiceType;
     storage.set('ve_voice_type', state.voiceType);
   }

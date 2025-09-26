@@ -5,7 +5,7 @@
  * 方案1：完整的TTS音频处理函数（推荐）
  * 从/api/tts接口获取JSON，正确解码Base64并播放音频
  */
-async function playTTSAudio(text, voiceType = 'zh_female_roumeinvyou_emo_v2_mars_bigtts') {
+async function playTTSAudio(text, voiceType = 'zh_female_tianmeitaozi_mars_bigtts') {
   try {
     // 1. 调用TTS API
     const response = await fetch('/api/tts', {
@@ -95,7 +95,7 @@ async function playTTSAudio(text, voiceType = 'zh_female_roumeinvyou_emo_v2_mars
 /**
  * 方案2：使用Data URL直接播放（简单方案）
  */
-async function playTTSAudioWithDataURL(text, voiceType = 'zh_female_roumeinvyou_emo_v2_mars_bigtts') {
+async function playTTSAudioWithDataURL(text, voiceType = 'zh_female_tianmeitaozi_mars_bigtts') {
   try {
     // 1. 调用TTS API
     const response = await fetch('/api/tts', {

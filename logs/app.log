@@ -368,3 +368,117 @@ Shutting down server...
 2025-09-16 11:10:24 - root - INFO - ==================================================
 2025-09-16 11:10:24 - root - INFO - Starting server on port 8000...
 2025-09-16 11:10:24 - root - INFO - Server running at http://localhost:8000/
+2025-09-26 10:13:01 - root - INFO - ==================================================
+2025-09-26 10:13:01 - root - INFO - Logging Service Initialized
+2025-09-26 10:13:01 - root - INFO -   Console Log Level: INFO
+2025-09-26 10:13:01 - root - INFO -   File Log Level:    DEBUG
+2025-09-26 10:13:01 - root - INFO -   Log File:          logs/app.log
+2025-09-26 10:13:01 - root - INFO -   Rotation Size:     5 MB
+2025-09-26 10:13:01 - root - INFO -   Rotation Backups:  5
+2025-09-26 10:13:01 - root - INFO -   Max Line Length:   8192 bytes
+2025-09-26 10:13:01 - root - INFO -   Verbose Debug:     False
+2025-09-26 10:13:01 - root - INFO -   Long Log Chunks:   logs/chunks
+2025-09-26 10:13:01 - root - INFO - ==================================================
+2025-09-26 10:13:07 - root - INFO - ==================================================
+2025-09-26 10:13:07 - root - INFO - Logging Service Initialized
+2025-09-26 10:13:07 - root - INFO -   Console Log Level: INFO
+2025-09-26 10:13:07 - root - INFO -   File Log Level:    DEBUG
+2025-09-26 10:13:07 - root - INFO -   Log File:          logs/app.log
+2025-09-26 10:13:07 - root - INFO -   Rotation Size:     5 MB
+2025-09-26 10:13:07 - root - INFO -   Rotation Backups:  5
+2025-09-26 10:13:07 - root - INFO -   Max Line Length:   8192 bytes
+2025-09-26 10:13:07 - root - INFO -   Verbose Debug:     False
+2025-09-26 10:13:07 - root - INFO -   Long Log Chunks:   logs/chunks
+2025-09-26 10:13:07 - root - INFO - ==================================================
+2025-09-26 10:13:50 - root - INFO - ==================================================
+2025-09-26 10:13:50 - root - INFO - Logging Service Initialized
+2025-09-26 10:13:50 - root - INFO -   Console Log Level: INFO
+2025-09-26 10:13:50 - root - INFO -   File Log Level:    DEBUG
+2025-09-26 10:13:50 - root - INFO -   Log File:          logs/app.log
+2025-09-26 10:13:50 - root - INFO -   Rotation Size:     5 MB
+2025-09-26 10:13:50 - root - INFO -   Rotation Backups:  5
+2025-09-26 10:13:50 - root - INFO -   Max Line Length:   8192 bytes
+2025-09-26 10:13:50 - root - INFO -   Verbose Debug:     False
+2025-09-26 10:13:50 - root - INFO -   Long Log Chunks:   logs/chunks
+2025-09-26 10:13:50 - root - INFO - ==================================================
+2025-09-26 10:13:50 - root - INFO - Starting server on port 8000...
+2025-09-26 10:13:50 - root - INFO - Server running at http://localhost:8000/
+2025-09-26 10:15:22 - root - INFO - ==================================================
+2025-09-26 10:15:22 - root - INFO - Logging Service Initialized
+2025-09-26 10:15:22 - root - INFO -   Console Log Level: INFO
+2025-09-26 10:15:22 - root - INFO -   File Log Level:    DEBUG
+2025-09-26 10:15:22 - root - INFO -   Log File:          logs/app.log
+2025-09-26 10:15:22 - root - INFO -   Rotation Size:     5 MB
+2025-09-26 10:15:22 - root - INFO -   Rotation Backups:  5
+2025-09-26 10:15:22 - root - INFO -   Max Line Length:   8192 bytes
+2025-09-26 10:15:22 - root - INFO -   Verbose Debug:     False
+2025-09-26 10:15:22 - root - INFO -   Long Log Chunks:   logs/chunks
+2025-09-26 10:15:22 - root - INFO - ==================================================
+2025-09-26 10:15:38 - root - INFO - ==================================================
+2025-09-26 10:15:38 - root - INFO - Logging Service Initialized
+2025-09-26 10:15:38 - root - INFO -   Console Log Level: INFO
+2025-09-26 10:15:38 - root - INFO -   File Log Level:    DEBUG
+2025-09-26 10:15:38 - root - INFO -   Log File:          logs/app.log
+2025-09-26 10:15:38 - root - INFO -   Rotation Size:     5 MB
+2025-09-26 10:15:38 - root - INFO -   Rotation Backups:  5
+2025-09-26 10:15:38 - root - INFO -   Max Line Length:   8192 bytes
+2025-09-26 10:15:38 - root - INFO -   Verbose Debug:     False
+2025-09-26 10:15:38 - root - INFO -   Long Log Chunks:   logs/chunks
+2025-09-26 10:15:38 - root - INFO - ==================================================
+2025-09-26 10:15:38 - root - INFO - Starting server on port 8000...
+2025-09-26 10:15:38 - root - INFO - Server running at http://localhost:8000/
+2025-09-26 10:15:44 - root - INFO - Routing POST /api/generate -> /api/generate
+2025-09-26 10:22:58 - root - INFO - ==================================================
+2025-09-26 10:22:58 - root - INFO - Logging Service Initialized
+2025-09-26 10:22:58 - root - INFO -   Console Log Level: INFO
+2025-09-26 10:22:58 - root - INFO -   File Log Level:    DEBUG
+2025-09-26 10:22:58 - root - INFO -   Log File:          logs/app.log
+2025-09-26 10:22:58 - root - INFO -   Rotation Size:     5 MB
+2025-09-26 10:22:58 - root - INFO -   Rotation Backups:  5
+2025-09-26 10:22:58 - root - INFO -   Max Line Length:   8192 bytes
+2025-09-26 10:22:58 - root - INFO -   Verbose Debug:     False
+2025-09-26 10:22:58 - root - INFO -   Long Log Chunks:   logs/chunks
+2025-09-26 10:22:58 - root - INFO - ==================================================
+2025-09-26 10:23:18 - root - INFO - ==================================================
+2025-09-26 10:23:18 - root - INFO - Logging Service Initialized
+2025-09-26 10:23:18 - root - INFO -   Console Log Level: INFO
+2025-09-26 10:23:18 - root - INFO -   File Log Level:    DEBUG
+2025-09-26 10:23:18 - root - INFO -   Log File:          logs/app.log
+2025-09-26 10:23:18 - root - INFO -   Rotation Size:     5 MB
+2025-09-26 10:23:18 - root - INFO -   Rotation Backups:  5
+2025-09-26 10:23:18 - root - INFO -   Max Line Length:   8192 bytes
+2025-09-26 10:23:18 - root - INFO -   Verbose Debug:     False
+2025-09-26 10:23:18 - root - INFO -   Long Log Chunks:   logs/chunks
+2025-09-26 10:23:18 - root - INFO - ==================================================
+2025-09-26 10:23:18 - root - INFO - Starting server on port 8000...
+2025-09-26 10:23:18 - root - INFO - Server running at http://localhost:8000/
+2025-09-26 10:23:26 - root - INFO - Routing POST /api/tts -> /api/tts
+2025-09-26 10:23:26 - api.tts - INFO - TTS request received for voice 'zh_female_tianmeitaozi_mars_bigtts' with text length 10.
+2025-09-26 10:23:26 - api.tts - DEBUG - TTS request parameters
+2025-09-26 10:23:26 - httpcore.connection - DEBUG - connect_tcp.started host='openspeech.bytedance.com' port=443 local_address=None timeout=120.0 socket_options=None
+2025-09-26 10:23:26 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x1076902c0>
+2025-09-26 10:23:26 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x1076e87d0> server_hostname='openspeech.bytedance.com' timeout=120.0
+2025-09-26 10:23:26 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x10687f740>
+2025-09-26 10:23:26 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-09-26 10:23:26 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-09-26 10:23:26 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-09-26 10:23:26 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-09-26 10:23:26 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-09-26 10:23:26 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Fri, 26 Sep 2025 02:23:26 GMT'), (b'Content-Type', b'application/json; charset=utf-8'), (b'Content-Length', b'118'), (b'Connection', b'keep-alive'), (b'X-Tt-Logid', b'2025092610232683B70363565D91833F16'), (b'Api-Service-Host', b'10.147.103.148'), (b'Session-Header', b'H6Xz5UoQu9far6O+0+D+ECV4VdkbbrexaI8qtrY/8xPET6tXM4Ps2oTzuPHOYXjuFtiHExlAfVB9INCFoxBsBNC08jPLRUGsmKfUYzBxPHvOZ8BBpX9cGHbJHN4+AYdm7D+NWJ8eeLvAKhcUKwco9TyB2vmQnjW7pKoanOhimZDNyqy0heP/keOGnTtLf5l/nbVNWEX6osmUhM/JQSY6r971rQV9bQxucY/SlGTW5dguo3VVHB0SQsXYQYNQAK/2R7NhUthBQ8W/Fq0PBlXAMW5lnR/CD+mlwBOsGVqw74N6CmHbc4nMU/Y55vFWsnYM3CRrw198eWlBpMJ8uL+miiTOIgvJaTGDrCmkN/O53OY='), (b'server-timing', b'inner; dur=37'), (b'x-tt-trace-host', b'01aa76b71de4a980f62142d03f92fa31ebc9d4a145107a8a8c5fb26aa6b13dfe6a0f9814e6bb61d18403f0e3bffaacee023d4f137f75ce5c018c42c161d7e567a6353fe739db83593bd07cf3ba9a9dad76'), (b'x-tt-trace-tag', b'id=00;cdn-cache=miss'), (b'x-tt-trace-id', b'00-25092610232683B70363565D91833F16-258BED9073D1342F-00'), (b'Server', b'TLB')])
+2025-09-26 10:23:26 - httpx - INFO - HTTP Request: POST https://openspeech.bytedance.com/api/v1/tts "HTTP/1.1 200 OK"
+2025-09-26 10:23:26 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-09-26 10:23:26 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-09-26 10:23:26 - httpcore.http11 - DEBUG - response_closed.started
+2025-09-26 10:23:26 - httpcore.http11 - DEBUG - response_closed.complete
+2025-09-26 10:23:28 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-09-26 10:23:28 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-09-26 10:23:28 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-09-26 10:23:28 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-09-26 10:23:28 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-09-26 10:23:29 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Fri, 26 Sep 2025 02:23:29 GMT'), (b'Content-Type', b'application/json; charset=utf-8'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Vary', b'Accept-Encoding'), (b'X-Tt-Logid', b'2025092610232883B70363565D91833F4D'), (b'Api-Service-Host', b'10.159.85.216'), (b'server-timing', b'inner; dur=640'), (b'x-tt-trace-host', b'01aa76b71de4a980f62142d03f92fa31ebc9d4a145107a8a8c5fb26aa6b13dfe6a0f9814e6bb61d18403f0e3bffaacee0291205e1fa017d75b97cdad071f6839ae946f67fff2830e894b247ca525ffa292'), (b'x-tt-trace-tag', b'id=00;cdn-cache=miss'), (b'x-tt-trace-id', b'00-25092610232883B70363565D91833F4D-258BED9073D134A2-00'), (b'Server', b'TLB'), (b'Content-Encoding', b'gzip')])
+2025-09-26 10:23:29 - httpx - INFO - HTTP Request: POST https://openspeech.bytedance.com/api/v1/tts "HTTP/1.1 200 OK"
+2025-09-26 10:23:29 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-09-26 10:23:29 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-09-26 10:23:29 - httpcore.http11 - DEBUG - response_closed.started
+2025-09-26 10:23:29 - httpcore.http11 - DEBUG - response_closed.complete
+2025-09-26 10:23:29 - api.tts - DEBUG - TTS synthesis successful

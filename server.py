@@ -43,6 +43,7 @@ class APIRouterHandler(SimpleHTTPRequestHandler):
     # 一个简单的路由字典，将URL路径映射到它们的处理器类。
     API_ROUTES = {
         '/api/ark': ark.handler,
+        '/api/generate': ark.handler,
         '/api/tts': tts.handler,
         '/api/voice_clone': voice_clone.handler,
         '/api/health': health.handler, # 新增的健康检查路由
