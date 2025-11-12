@@ -36,11 +36,40 @@
                     <button id="closeHistoryModal" class="close-btn">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div class="history-controls">
-                        <button id="clearAllHistory" class="btn btn-danger">清空所有记录</button>
+                    <!-- 标签页切换 -->
+                    <div class="tabs" style="display: flex; gap: 16px; margin-bottom: 16px; border-bottom: 2px solid #e9ecef;">
+                        <button class="tab-btn active" data-tab="history" style="padding: 12px 16px; border: none; background: none; cursor: pointer; border-bottom: 3px solid #667eea; color: #667eea; font-weight: 600;">
+                            📚 历史记录
+                        </button>
+                        <button class="tab-btn" data-tab="favorites" style="padding: 12px 16px; border: none; background: none; cursor: pointer; border-bottom: 3px solid transparent; color: #666; font-weight: 600;">
+                            ⭐ 我的收藏
+                        </button>
                     </div>
-                    <div class="history-list" id="historyList">
-                        <p class="empty-state">暂无历史记录</p>
+
+                    <!-- 历史记录标签页 -->
+                    <div class="tab-content" id="historyTab">
+                        <div class="history-controls">
+                            <button id="clearAllHistory" class="btn btn-danger">清空所有记录</button>
+                        </div>
+                        <div class="history-list" id="historyList">
+                            <p class="empty-state">暂无历史记录</p>
+                        </div>
+                    </div>
+
+                    <!-- 收藏标签页 -->
+                    <div class="tab-content" id="favoritesTab" style="display: none;">
+                        <div class="favorites-controls" style="display: flex; gap: 8px; margin-bottom: 16px;">
+                            <button id="clearAllFavorites" class="btn btn-danger">清空收藏</button>
+                            <button id="exportFavorites" class="btn btn-outline">导出收藏</button>
+                            <input type="file" id="importFavoritesInput" accept=".json" style="display: none;">
+                            <button id="importFavorites" class="btn btn-outline">导入收藏</button>
+                        </div>
+                        <div class="favorites-stats" id="favoritesStats" style="margin-bottom: 16px; padding: 12px; background: #f8f9fa; border-radius: 8px;">
+                            <!-- 统计信息将动态添加 -->
+                        </div>
+                        <div class="favorites-list" id="favoritesList">
+                            <p class="empty-state">暂无收藏内容</p>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -108,7 +137,13 @@
 
             <!-- 内容展示区域 -->
             <section class="result-section" id="resultSection" style="display: none;">
-                <h2>生成的胎教内容</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h2 style="margin: 0;">生成的胎教内容</h2>
+                    <button id="favoriteBtn" class="btn btn-outline btn-icon" title="收藏此内容" style="display: flex; align-items: center; gap: 8px;">
+                        <span id="favoriteIcon">⭐</span>
+                        <span id="favoriteText">收藏</span>
+                    </button>
+                </div>
                 <div class="content-display">
                     <div class="content-text-container">
                         <div class="content-text" id="contentText"></div>
@@ -341,5 +376,6 @@
     </script>
     <!-- 引入模块化脚本 -->
     <script type="module" src="script.js"></script>
+    <script type="module" src="favorites-ui.js"></script>
 </body>
 </html>

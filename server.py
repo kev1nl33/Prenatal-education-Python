@@ -25,7 +25,7 @@ except ImportError as e:
 # --- API 模块导入 ---
 # 在启动时导入所有API模块，以提高性能和可维护性
 try:
-    from api import ark, tts, voice_clone, health, debug
+    from api import ark, tts, voice_clone, health, debug, auth
 except ImportError as e:
     logging.critical(f"无法导入API模块. {e}", exc_info=True)
     sys.exit(1)
@@ -47,6 +47,7 @@ class APIRouterHandler(SimpleHTTPRequestHandler):
         '/api/tts': tts.handler,
         '/api/voice_clone': voice_clone.handler,
         '/api/health': health.handler, # 新增的健康检查路由
+        '/api/auth': auth.handler, # 认证API
     }
 
     def _send_json_response(self, status_code, data, headers=None):
