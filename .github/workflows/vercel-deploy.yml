@@ -1,0 +1,141 @@
+name: Vercel Deployment Sync
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  deploy-check:
+    name: Verify Deployment Configuration
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check Vercel configuration
+      run: |
+        echo "Verifying Vercel configuration..."
+        if [ ! -f vercel.json ]; then
+          echo "Error: vercel.json not found"
+          exit 1
+        fi
+
+        echo "vercel.json content:"
+        cat vercel.json
+
+        echo -e "\nValidating JSON syntax..."
+        cat vercel.json | python -m json.tool > /dev/null
+        echo "vercel.json is valid JSON"
+
+    - name: Check API files
+      run: |
+        echo "Checking API files structure..."
+        required_files=(
+          "api/ark.py"
+          "api/tts.py"
+          "api/voice_clone.py"
+          "api/health.py"
+        )
+
+        for file in "${required_files[@]}"; do
+          if [ -f "$file" ]; then
+            echo "✓ $file exists"
+          else
+            echo "✗ $file missing"
+            exit 1
+          fi
+        done
+
+    - name: Verify Python dependencies
+      run: |
+        echo "Checking requirements.txt..."
+        if [ ! -f requirements.txt ]; then
+          echo "Error: requirements.txt not found"
+          exit 1
+        fi
+
+        echo "requirements.txt content:"
+        cat requirements.txt
+
+    - name: Check environment variables template
+      run: |
+        echo "Checking .env.example..."
+        if [ -f .env.example ]; then
+          echo ".env.example content:"
+          cat .env.example
+        else
+          echo "Warning: .env.example not found"
+        fi
+
+    - name: Verify public assets
+      run: |
+        echo "Checking public directory..."
+        if [ -d public ]; then
+          echo "Public directory contents:"
+          ls -la public/
+        else
+          echo "Warning: public directory not found"
+        fi
+
+    - name: Deployment summary
+      run: |
+        echo "==================================="
+        echo "Deployment Configuration Summary"
+        echo "==================================="
+        echo "Project: Prenatal Education Python"
+        echo "Framework: Python HTTP Server"
+        echo "Platform: Vercel Serverless"
+        echo "Node Version: 22.x"
+        echo "==================================="
+        echo ""
+        echo "✓ All deployment checks passed"
+        echo ""
+        echo "Note: Actual deployment is handled by Vercel"
+        echo "Connect your repository to Vercel for automatic deployments"
+        echo "Visit: https://vercel.com/dashboard"
+
+  sync-status:
+    name: Check Sync Status
+    runs-on: ubuntu-latest
+    needs: deploy-check
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Get commit information
+      run: |
+        echo "Latest commit:"
+        git log -1 --pretty=format:"%h - %an, %ar : %s"
+        echo ""
+        echo ""
+        echo "Branch: $(git branch --show-current)"
+        echo "Commit SHA: $(git rev-parse HEAD)"
+
+    - name: Check for deployment triggers
+      run: |
+        echo "Checking files changed in last commit..."
+        FILES_CHANGED=$(git diff --name-only HEAD~1 HEAD || echo "No previous commit")
+
+        if [ -n "$FILES_CHANGED" ]; then
+          echo "Files changed:"
+          echo "$FILES_CHANGED"
+
+          # Check if deployment-critical files changed
+          if echo "$FILES_CHANGED" | grep -E "(api/|vercel.json|requirements.txt)"; then
+            echo ""
+            echo "⚠️  Deployment-critical files changed!"
+            echo "Vercel should trigger automatic deployment"
+          fi
+        fi
+
+    - name: Sync status summary
+      run: |
+        echo "==================================="
+        echo "GitHub Actions Sync Status: ✓ Active"
+        echo "Last Run: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+        echo "==================================="
