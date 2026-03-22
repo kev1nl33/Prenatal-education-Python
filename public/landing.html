@@ -1,0 +1,1688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能胎教助手 — 用你的声音给宝宝最温暖的胎教时光</title>
+<style>
+  :root {
+    --night: #0A0E27;
+    --deep: #0D1235;
+    --mid: #141840;
+    --cream: #FFF8F0;
+    --pink: #FFB5C8;
+    --pink-deep: #FF8FA8;
+    --lavender: #C8B5FF;
+    --lavender-deep: #A890FF;
+    --gold: #FFD89B;
+    --text-main: #FFF8F0;
+    --text-muted: rgba(255,248,240,0.6);
+    --text-dim: rgba(255,248,240,0.35);
+    --glass: rgba(255,255,255,0.05);
+    --glass-border: rgba(255,255,255,0.1);
+    --glass-hover: rgba(255,255,255,0.09);
+    --radius: 24px;
+    --radius-sm: 14px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+    background-color: var(--night);
+    color: var(--text-main);
+    overflow-x: hidden;
+    line-height: 1.7;
+  }
+
+  /* ─── NOISE TEXTURE OVERLAY ─── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  /* ─── GLOW ORBS ─── */
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.18;
+  }
+  .orb-1 { width: 600px; height: 600px; background: var(--lavender); top: -200px; right: -100px; }
+  .orb-2 { width: 500px; height: 500px; background: var(--pink); bottom: 20%; left: -150px; }
+  .orb-3 { width: 400px; height: 400px; background: var(--gold); top: 50%; left: 40%; }
+
+  /* ─── NAV ─── */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    padding: 16px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(10,14,39,0.75);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-bottom: 1px solid var(--glass-border);
+    transition: all 0.3s ease;
+  }
+  .nav-logo {
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    color: var(--text-main);
+  }
+  .nav-logo .moon { font-size: 1.4rem; }
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    list-style: none;
+  }
+  .nav-links a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+  .nav-links a:hover { color: var(--text-main); }
+  .nav-cta {
+    background: linear-gradient(135deg, var(--pink), var(--pink-deep));
+    color: var(--night) !important;
+    font-weight: 700 !important;
+    padding: 10px 22px;
+    border-radius: 50px;
+    transition: transform 0.2s, box-shadow 0.2s !important;
+  }
+  .nav-cta:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(255,181,200,0.4) !important;
+    color: var(--night) !important;
+  }
+  .hamburger {
+    display: none;
+    flex-direction: column;
+    gap: 5px;
+    cursor: pointer;
+    padding: 4px;
+  }
+  .hamburger span {
+    width: 24px; height: 2px;
+    background: var(--text-main);
+    border-radius: 2px;
+    transition: 0.3s;
+  }
+
+  /* ─── HERO ─── */
+  #hero {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    padding: 120px 40px 80px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: 60px;
+    position: relative;
+    z-index: 1;
+  }
+  .hero-text { }
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 50px;
+    padding: 8px 18px;
+    font-size: 0.8rem;
+    color: var(--lavender);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    margin-bottom: 28px;
+    text-transform: uppercase;
+  }
+  .hero-badge::before { content: '✦'; color: var(--gold); }
+  .hero-title {
+    font-size: clamp(2.4rem, 5vw, 4rem);
+    font-weight: 900;
+    line-height: 1.15;
+    letter-spacing: -0.03em;
+    margin-bottom: 24px;
+  }
+  .hero-title .line-pink {
+    color: transparent;
+    background: linear-gradient(135deg, var(--pink), var(--lavender));
+    -webkit-background-clip: text;
+    background-clip: text;
+    display: block;
+  }
+  .hero-subtitle {
+    font-size: 1.05rem;
+    color: var(--text-muted);
+    margin-bottom: 40px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+  }
+  .hero-subtitle span {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .hero-subtitle .dot { color: var(--lavender); font-size: 1.2rem; }
+  .hero-btns {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, var(--pink) 0%, var(--pink-deep) 100%);
+    color: #1a0812;
+    font-weight: 800;
+    font-size: 1rem;
+    padding: 16px 32px;
+    border-radius: 50px;
+    text-decoration: none;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 20px rgba(255,143,168,0.3);
+    border: none;
+    cursor: pointer;
+  }
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 35px rgba(255,143,168,0.5);
+  }
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    color: var(--text-main);
+    font-weight: 600;
+    font-size: 1rem;
+    padding: 16px 32px;
+    border-radius: 50px;
+    text-decoration: none;
+    border: 1.5px solid var(--glass-border);
+    transition: border-color 0.2s, background 0.2s;
+    cursor: pointer;
+  }
+  .btn-secondary:hover {
+    border-color: rgba(255,255,255,0.3);
+    background: var(--glass);
+  }
+
+  /* Stars */
+  .stars-bg {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .star {
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+    animation: twinkle var(--dur, 3s) ease-in-out infinite;
+    animation-delay: var(--delay, 0s);
+  }
+  @keyframes twinkle {
+    0%, 100% { opacity: var(--min-op, 0.1); transform: scale(1); }
+    50% { opacity: var(--max-op, 0.8); transform: scale(1.3); }
+  }
+
+  /* Phone Mockup */
+  .hero-visual { display: flex; justify-content: center; align-items: center; }
+  .phone-mockup {
+    width: 280px;
+    height: 560px;
+    background: linear-gradient(160deg, #1a1f4a, #0d1035);
+    border-radius: 40px;
+    border: 2px solid rgba(200,181,255,0.25);
+    position: relative;
+    box-shadow:
+      0 40px 80px rgba(0,0,0,0.6),
+      0 0 0 1px rgba(255,255,255,0.05),
+      inset 0 1px 0 rgba(255,255,255,0.08);
+    overflow: hidden;
+    animation: float 5s ease-in-out infinite;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
+  }
+  .phone-notch {
+    width: 100px; height: 28px;
+    background: #0A0E27;
+    border-radius: 0 0 20px 20px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 2;
+  }
+  .phone-screen {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .phone-header {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--lavender);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.8;
+  }
+  .phone-title-bar {
+    font-size: 0.9rem;
+    font-weight: 800;
+    color: var(--cream);
+  }
+  .phone-wave {
+    height: 60px;
+    background: linear-gradient(135deg, rgba(200,181,255,0.15), rgba(255,181,200,0.15));
+    border-radius: 12px;
+    border: 1px solid rgba(200,181,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .phone-wave::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(200,181,255,0.1), transparent);
+    animation: shimmer 2s linear infinite;
+  }
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+  .phone-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .phone-chip {
+    background: rgba(255,181,200,0.15);
+    border: 1px solid rgba(255,181,200,0.3);
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 0.6rem;
+    color: var(--pink);
+    font-weight: 600;
+  }
+  .phone-content-block {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px;
+    padding: 12px;
+  }
+  .phone-content-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--cream);
+    margin-bottom: 4px;
+  }
+  .phone-content-lines { display: flex; flex-direction: column; gap: 4px; }
+  .phone-content-line {
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.1);
+  }
+  .phone-content-line.w80 { width: 80%; }
+  .phone-content-line.w60 { width: 60%; }
+  .phone-content-line.w90 { width: 90%; }
+  .phone-play-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: linear-gradient(135deg, var(--pink), var(--pink-deep));
+    border-radius: 50px;
+    padding: 10px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #1a0812;
+    cursor: pointer;
+  }
+  .phone-decor {
+    position: absolute;
+    top: 30px; right: -60px;
+    font-size: 5rem;
+    opacity: 0.08;
+    animation: spin-slow 30s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes spin-slow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  .moon-deco {
+    position: absolute;
+    font-size: 8rem;
+    top: 50%; left: -40px;
+    transform: translateY(-50%);
+    opacity: 0.06;
+    filter: blur(2px);
+    pointer-events: none;
+  }
+
+  /* ─── SECTION COMMONS ─── */
+  section { position: relative; z-index: 1; }
+  .section-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 100px 40px;
+  }
+  .section-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--lavender);
+    margin-bottom: 16px;
+  }
+  .section-label::before, .section-label::after {
+    content: '—';
+    opacity: 0.4;
+  }
+  .section-title {
+    font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    margin-bottom: 16px;
+  }
+  .section-subtitle {
+    font-size: 1rem;
+    color: var(--text-muted);
+    max-width: 520px;
+    margin-bottom: 60px;
+  }
+
+  /* WAVE DIVIDERS */
+  .wave-divider {
+    width: 100%;
+    overflow: hidden;
+    line-height: 0;
+    position: relative;
+    z-index: 1;
+  }
+  .wave-divider svg { display: block; }
+
+  /* ─── FEATURES ─── */
+  #features { background: linear-gradient(180deg, var(--night) 0%, var(--deep) 100%); }
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 24px;
+  }
+  .feature-card {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    padding: 36px 28px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
+    cursor: default;
+  }
+  .feature-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 0%, rgba(255,255,255,0.07) 0%, transparent 65%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .feature-card:hover::before { opacity: 1; }
+  .feature-card:hover {
+    transform: translateY(-6px);
+    border-color: rgba(200,181,255,0.25);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.4), 0 0 0 1px rgba(200,181,255,0.1);
+  }
+  .feature-icon {
+    font-size: 2.4rem;
+    margin-bottom: 20px;
+    display: block;
+  }
+  .feature-title {
+    font-size: 1.15rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin-bottom: 10px;
+  }
+  .feature-desc {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+  .feature-card-glow {
+    position: absolute;
+    bottom: -30px; right: -30px;
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    filter: blur(40px);
+    opacity: 0.12;
+    transition: opacity 0.3s;
+  }
+  .feature-card:hover .feature-card-glow { opacity: 0.22; }
+
+  /* ─── SCENARIOS ─── */
+  #scenarios { background: var(--deep); }
+  .scenario {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: 60px;
+    margin-bottom: 80px;
+  }
+  .scenario:last-child { margin-bottom: 0; }
+  .scenario.reverse { direction: rtl; }
+  .scenario.reverse > * { direction: ltr; }
+  .scenario-visual {
+    aspect-ratio: 4/3;
+    border-radius: var(--radius);
+    border: 1px solid var(--glass-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .scenario-visual .big-emoji {
+    font-size: 5rem;
+    display: block;
+    filter: drop-shadow(0 0 20px rgba(255,181,200,0.3));
+    animation: gentle-pulse 4s ease-in-out infinite;
+  }
+  @keyframes gentle-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+  }
+  .scenario-visual .sub-emojis {
+    display: flex;
+    gap: 12px;
+    font-size: 1.5rem;
+  }
+  .scenario-visual-label {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 50px;
+    padding: 6px 16px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    white-space: nowrap;
+    backdrop-filter: blur(10px);
+  }
+  .sv-mom { background: linear-gradient(135deg, rgba(255,181,200,0.08), rgba(255,181,200,0.02)); }
+  .sv-dad { background: linear-gradient(135deg, rgba(200,181,255,0.08), rgba(200,181,255,0.02)); }
+  .sv-family { background: linear-gradient(135deg, rgba(255,216,155,0.08), rgba(255,216,155,0.02)); }
+  .scenario-text {}
+  .scenario-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    padding: 5px 14px;
+    border-radius: 50px;
+  }
+  .tag-pink { background: rgba(255,181,200,0.12); color: var(--pink); border: 1px solid rgba(255,181,200,0.2); }
+  .tag-lavender { background: rgba(200,181,255,0.12); color: var(--lavender); border: 1px solid rgba(200,181,255,0.2); }
+  .tag-gold { background: rgba(255,216,155,0.12); color: var(--gold); border: 1px solid rgba(255,216,155,0.2); }
+  .scenario-title {
+    font-size: 1.8rem;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    margin-bottom: 16px;
+  }
+  .scenario-desc {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    line-height: 1.75;
+  }
+  .scenario-feature-list {
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .scenario-feature-list li {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+  }
+  .scenario-feature-list li::before {
+    content: '✓';
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: rgba(255,181,200,0.15);
+    color: var(--pink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 900;
+    flex-shrink: 0;
+  }
+
+  /* ─── STATS ─── */
+  #stats {
+    background: linear-gradient(135deg, rgba(200,181,255,0.05) 0%, rgba(255,181,200,0.05) 100%);
+    border-top: 1px solid var(--glass-border);
+    border-bottom: 1px solid var(--glass-border);
+  }
+  .stats-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 80px 40px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+    text-align: center;
+  }
+  .stat-item {}
+  .stat-number {
+    font-size: clamp(2rem, 4vw, 3.2rem);
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    background: linear-gradient(135deg, var(--pink), var(--lavender));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    display: block;
+    margin-bottom: 8px;
+  }
+  .stat-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  /* ─── PRICING ─── */
+  #pricing { background: var(--night); }
+  .pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+  .pricing-card {
+    border-radius: var(--radius);
+    padding: 40px 32px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--glass-border);
+    transition: transform 0.3s;
+  }
+  .pricing-card:hover { transform: translateY(-4px); }
+  .pc-free {
+    background: linear-gradient(160deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+  }
+  .pc-pro {
+    background: linear-gradient(160deg, rgba(255,143,168,0.12), rgba(200,181,255,0.08));
+    border-color: rgba(255,143,168,0.35);
+    animation: glow-border 3s ease-in-out infinite;
+  }
+  @keyframes glow-border {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,143,168,0); }
+    50% { box-shadow: 0 0 30px -5px rgba(255,143,168,0.3), 0 0 0 1px rgba(255,143,168,0.15); }
+  }
+  .pc-annual {
+    background: linear-gradient(160deg, rgba(200,181,255,0.1), rgba(200,181,255,0.04));
+    border-color: rgba(200,181,255,0.2);
+  }
+  .pricing-badge {
+    position: absolute;
+    top: 20px; right: 20px;
+    background: linear-gradient(135deg, var(--pink), var(--pink-deep));
+    color: #1a0812;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border-radius: 50px;
+  }
+  .pricing-plan {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+  .pricing-price {
+    font-size: 3rem;
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .pricing-price .currency { font-size: 1.2rem; vertical-align: super; font-weight: 700; }
+  .pricing-price .period { font-size: 1rem; font-weight: 500; color: var(--text-muted); }
+  .pricing-note {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 28px;
+    min-height: 20px;
+  }
+  .pricing-divider {
+    height: 1px;
+    background: var(--glass-border);
+    margin-bottom: 24px;
+  }
+  .pricing-features {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+  .pricing-features li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+  }
+  .pricing-features li .check {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.6rem;
+    font-weight: 900;
+    flex-shrink: 0;
+  }
+  .check-free { background: rgba(255,255,255,0.08); color: var(--text-dim); }
+  .check-pro { background: rgba(255,143,168,0.2); color: var(--pink); }
+  .check-annual { background: rgba(200,181,255,0.2); color: var(--lavender); }
+  .pricing-btn {
+    display: block;
+    text-align: center;
+    padding: 14px 24px;
+    border-radius: 50px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+    border: none;
+    width: 100%;
+  }
+  .btn-free {
+    background: rgba(255,255,255,0.08);
+    color: var(--text-muted);
+    border: 1px solid var(--glass-border);
+  }
+  .btn-free:hover { background: rgba(255,255,255,0.12); color: var(--text-main); }
+  .btn-pro {
+    background: linear-gradient(135deg, var(--pink), var(--pink-deep));
+    color: #1a0812;
+    box-shadow: 0 6px 20px rgba(255,143,168,0.3);
+  }
+  .btn-pro:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(255,143,168,0.45); }
+  .btn-annual {
+    background: rgba(200,181,255,0.15);
+    color: var(--lavender);
+    border: 1px solid rgba(200,181,255,0.25);
+  }
+  .btn-annual:hover { background: rgba(200,181,255,0.22); color: var(--text-main); }
+  .save-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255,216,155,0.12);
+    color: var(--gold);
+    border: 1px solid rgba(255,216,155,0.2);
+    border-radius: 50px;
+    padding: 3px 10px;
+    font-size: 0.7rem;
+    font-weight: 700;
+  }
+
+  /* ─── TESTIMONIALS ─── */
+  #testimonials { background: var(--deep); }
+  .testimonials-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+  .testimonial-card {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    padding: 32px 28px;
+    position: relative;
+    transition: transform 0.3s, border-color 0.3s;
+  }
+  .testimonial-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(200,181,255,0.2);
+  }
+  .testimonial-card::before {
+    content: '"';
+    position: absolute;
+    top: 20px; right: 24px;
+    font-size: 5rem;
+    line-height: 1;
+    color: rgba(200,181,255,0.1);
+    font-family: Georgia, serif;
+    pointer-events: none;
+  }
+  .testimonial-stars {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 16px;
+  }
+  .star-icon { color: var(--gold); font-size: 0.85rem; }
+  .testimonial-text {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    line-height: 1.7;
+    margin-bottom: 24px;
+    position: relative;
+    z-index: 1;
+  }
+  .testimonial-author {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .testimonial-avatar {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+  }
+  .av-1 { background: linear-gradient(135deg, rgba(255,181,200,0.3), rgba(255,181,200,0.1)); }
+  .av-2 { background: linear-gradient(135deg, rgba(200,181,255,0.3), rgba(200,181,255,0.1)); }
+  .av-3 { background: linear-gradient(135deg, rgba(255,216,155,0.3), rgba(255,216,155,0.1)); }
+  .testimonial-name {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--text-main);
+  }
+  .testimonial-info {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+
+  /* ─── FAQ ─── */
+  #faq { background: var(--night); }
+  .faq-list {
+    max-width: 720px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .faq-item {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .faq-item.open {
+    border-color: rgba(200,181,255,0.2);
+  }
+  .faq-question {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 22px 24px;
+    cursor: pointer;
+    user-select: none;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text-main);
+    transition: color 0.2s;
+  }
+  .faq-question:hover { color: var(--lavender); }
+  .faq-icon {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 1px solid var(--glass-border);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    font-size: 0.85rem;
+    color: var(--lavender);
+    transition: transform 0.3s, background 0.3s;
+  }
+  .faq-item.open .faq-icon {
+    transform: rotate(45deg);
+    background: rgba(200,181,255,0.1);
+  }
+  .faq-answer {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .faq-item.open .faq-answer { max-height: 200px; }
+  .faq-answer-inner {
+    padding: 0 24px 22px;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+
+  /* ─── CTA BANNER ─── */
+  #cta-banner {
+    padding: 0 40px;
+    position: relative;
+    z-index: 1;
+    margin-bottom: 0;
+  }
+  .cta-banner-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: linear-gradient(135deg, rgba(255,143,168,0.15) 0%, rgba(200,181,255,0.15) 100%);
+    border: 1px solid rgba(255,143,168,0.2);
+    border-radius: 32px;
+    padding: 80px 60px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .cta-banner-inner::before {
+    content: '';
+    position: absolute;
+    top: -50%; left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 200%;
+    background: radial-gradient(ellipse, rgba(255,181,200,0.12) 0%, transparent 65%);
+    pointer-events: none;
+  }
+  .cta-banner-title {
+    font-size: clamp(1.8rem, 4vw, 3rem);
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+    position: relative;
+    z-index: 1;
+  }
+  .cta-banner-sub {
+    font-size: 1rem;
+    color: var(--text-muted);
+    margin-bottom: 40px;
+    position: relative;
+    z-index: 1;
+  }
+  .cta-banner-btns {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+    position: relative;
+    z-index: 1;
+  }
+  .cta-moon { position: absolute; font-size: 8rem; bottom: -20px; right: -20px; opacity: 0.06; pointer-events: none; }
+  .cta-star { position: absolute; font-size: 4rem; top: 20px; left: 40px; opacity: 0.06; pointer-events: none; }
+
+  /* ─── FOOTER ─── */
+  footer {
+    background: linear-gradient(180deg, var(--night) 0%, #050710 100%);
+    border-top: 1px solid var(--glass-border);
+    padding: 60px 40px 40px;
+    position: relative;
+    z-index: 1;
+  }
+  .footer-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 60px;
+    padding-bottom: 40px;
+    border-bottom: 1px solid var(--glass-border);
+    margin-bottom: 32px;
+  }
+  .footer-brand {}
+  .footer-logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--text-main);
+    text-decoration: none;
+    margin-bottom: 12px;
+  }
+  .footer-desc {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    line-height: 1.65;
+    max-width: 260px;
+    margin-bottom: 20px;
+  }
+  .footer-contact {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .footer-contact a {
+    color: var(--lavender);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .footer-contact a:hover { color: var(--text-main); }
+  .footer-col-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+  }
+  .footer-links {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .footer-links a {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .footer-links a:hover { color: var(--text-main); }
+  .footer-bottom {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .footer-copy {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+  }
+  .footer-bottom-links {
+    display: flex;
+    gap: 24px;
+  }
+  .footer-bottom-links a {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .footer-bottom-links a:hover { color: var(--text-muted); }
+
+  /* ─── ANIMATIONS ─── */
+  .fade-in {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .fade-in.visible { opacity: 1; transform: translateY(0); }
+  .fade-in-delay-1 { transition-delay: 0.1s; }
+  .fade-in-delay-2 { transition-delay: 0.2s; }
+  .fade-in-delay-3 { transition-delay: 0.3s; }
+  .fade-in-delay-4 { transition-delay: 0.4s; }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 960px) {
+    nav { padding: 14px 20px; }
+    .nav-links { display: none; }
+    .nav-links.open {
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 64px; left: 0; right: 0;
+      background: rgba(10,14,39,0.97);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--glass-border);
+      padding: 24px 20px;
+      gap: 16px;
+      z-index: 99;
+      align-items: flex-start;
+    }
+    .nav-links.open .nav-cta {
+      align-self: stretch;
+      text-align: center;
+    }
+    .hamburger { display: flex; }
+    #hero { padding: 100px 20px 60px; }
+    .hero-inner { grid-template-columns: 1fr; gap: 40px; }
+    .hero-visual { order: -1; }
+    .phone-mockup { width: 220px; height: 440px; }
+    .section-inner { padding: 70px 20px; }
+    .features-grid { grid-template-columns: 1fr 1fr; }
+    .scenario { grid-template-columns: 1fr; gap: 32px; }
+    .scenario.reverse { direction: ltr; }
+    .stats-inner { grid-template-columns: repeat(2, 1fr); padding: 60px 20px; gap: 32px; }
+    .pricing-grid { grid-template-columns: 1fr; max-width: 420px; margin: 0 auto; }
+    .testimonials-grid { grid-template-columns: 1fr; }
+    .footer-inner { grid-template-columns: 1fr; gap: 32px; }
+    #cta-banner { padding: 0 20px; }
+    .cta-banner-inner { padding: 60px 32px; }
+    footer { padding: 40px 20px 30px; }
+  }
+  @media (max-width: 600px) {
+    .features-grid { grid-template-columns: 1fr; }
+    .hero-title { font-size: 2rem; }
+    .pricing-grid { max-width: 100%; }
+    .stats-inner { grid-template-columns: repeat(2, 1fr); }
+    .footer-bottom { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Ambient orbs -->
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+
+<!-- ─── NAV ─── -->
+<nav id="navbar">
+  <a href="#" class="nav-logo">
+    <span class="moon">🌙</span>
+    <span>智能胎教助手</span>
+  </a>
+  <ul class="nav-links" id="navLinks">
+    <li><a href="#features">功能</a></li>
+    <li><a href="#scenarios">场景</a></li>
+    <li><a href="#pricing">价格</a></li>
+    <li><a href="#faq">FAQ</a></li>
+    <li><a href="/home" class="nav-cta">立即试用</a></li>
+  </ul>
+  <div class="hamburger" id="hamburger" onclick="toggleMenu()" aria-label="菜单">
+    <span></span><span></span><span></span>
+  </div>
+</nav>
+
+<!-- ─── HERO ─── -->
+<section id="hero">
+  <div class="stars-bg" id="starsContainer"></div>
+  <div class="moon-deco">🌙</div>
+
+  <div class="hero-inner">
+    <div class="hero-text">
+      <div class="hero-badge fade-in">专为孕期家庭打造</div>
+      <h1 class="hero-title fade-in fade-in-delay-1">
+        用你的声音<br>
+        <span class="line-pink">给宝宝最温暖的</span>
+        胎教时光
+      </h1>
+      <p class="hero-subtitle fade-in fade-in-delay-2">
+        <span>AI 智能生成</span>
+        <span class="dot">&nbsp;·&nbsp;</span>
+        <span>声音复刻</span>
+        <span class="dot">&nbsp;·&nbsp;</span>
+        <span>温柔相伴每一天</span>
+      </p>
+      <div class="hero-btns fade-in fade-in-delay-3">
+        <a href="/home" class="btn-primary">
+          🎵 立即免费试用
+        </a>
+        <a href="#pricing" class="btn-secondary">
+          了解专业版 →
+        </a>
+      </div>
+    </div>
+
+    <div class="hero-visual fade-in fade-in-delay-2">
+      <div class="phone-mockup">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+          <div class="phone-header">智能胎教助手</div>
+          <div class="phone-title-bar">今日胎教 · 睡前故事</div>
+          <div class="phone-wave">🎵</div>
+          <div class="phone-chips">
+            <span class="phone-chip">温馨故事</span>
+            <span class="phone-chip">音乐引导</span>
+            <span class="phone-chip">诗歌朗诵</span>
+            <span class="phone-chip">自然音效</span>
+          </div>
+          <div class="phone-content-block">
+            <div class="phone-content-title">🌙 小星星的梦</div>
+            <div class="phone-content-lines">
+              <div class="phone-content-line w90"></div>
+              <div class="phone-content-line w80"></div>
+              <div class="phone-content-line w60"></div>
+            </div>
+          </div>
+          <div class="phone-play-btn">▶ &nbsp;用妈妈的声音播放</div>
+        </div>
+        <div class="phone-decor">✦</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Wave divider -->
+<div class="wave-divider">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 60" fill="none">
+    <path d="M0,30 C240,60 480,0 720,30 C960,60 1200,0 1440,30 L1440,60 L0,60 Z" fill="#0D1235"/>
+  </svg>
+</div>
+
+<!-- ─── FEATURES ─── -->
+<section id="features">
+  <div class="section-inner">
+    <div style="text-align:center" class="fade-in">
+      <div class="section-label">核心功能</div>
+      <h2 class="section-title">为你们精心打造的<br>每一项功能</h2>
+      <p class="section-subtitle" style="margin:0 auto 60px">从内容生成到声音复刻，每一个功能都经过深思熟虑，只为陪伴你们最珍贵的时光。</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card fade-in fade-in-delay-1">
+        <div class="feature-card-glow" style="background:var(--lavender)"></div>
+        <span class="feature-icon">🤖</span>
+        <div class="feature-title">AI 智能生成</div>
+        <p class="feature-desc">温馨故事、音乐引导、诗歌朗诵，根据不同心情和场景，一键生成专属胎教内容，每次都有新惊喜。</p>
+      </div>
+      <div class="feature-card fade-in fade-in-delay-2">
+        <div class="feature-card-glow" style="background:var(--pink)"></div>
+        <span class="feature-icon">🎙️</span>
+        <div class="feature-title">声音复刻</div>
+        <p class="feature-desc">只需上传 3-5 分钟录音，AI 便能学会你的声音，让宝宝在妈妈肚子里就感受到爸爸、奶奶的陪伴。</p>
+      </div>
+      <div class="feature-card fade-in fade-in-delay-3">
+        <div class="feature-card-glow" style="background:var(--gold)"></div>
+        <span class="feature-icon">🎵</span>
+        <div class="feature-title">多种胎教风格</div>
+        <p class="feature-desc">10+ 精选风格：古典音乐、大自然音效、童话故事、中国古诗、英语启蒙……总有一款适合今天的心情。</p>
+      </div>
+      <div class="feature-card fade-in fade-in-delay-4">
+        <div class="feature-card-glow" style="background:var(--lavender)"></div>
+        <span class="feature-icon">📚</span>
+        <div class="feature-title">珍贵历史记录</div>
+        <p class="feature-desc">每一次生成都被完整保存。宝宝出生后，这些珍贵的声音将成为无价的家庭回忆，随时可以重温。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Wave divider -->
+<div class="wave-divider" style="transform:scaleY(-1)">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 60" fill="none">
+    <path d="M0,30 C240,60 480,0 720,30 C960,60 1200,0 1440,30 L1440,60 L0,60 Z" fill="#0D1235"/>
+  </svg>
+</div>
+
+<!-- ─── SCENARIOS ─── -->
+<section id="scenarios">
+  <div class="section-inner">
+    <div style="text-align:center" class="fade-in">
+      <div class="section-label">使用场景</div>
+      <h2 class="section-title">每个时刻，都是胎教的好时光</h2>
+      <p class="section-subtitle" style="margin:0 auto 70px">无论你在哪里，爱从未缺席。</p>
+    </div>
+
+    <div class="scenario fade-in">
+      <div class="scenario-visual sv-mom">
+        <span class="big-emoji">👩</span>
+        <div class="sub-emojis">🌙 📱 🎵</div>
+        <div class="scenario-visual-label">睡前胎教时光</div>
+      </div>
+      <div class="scenario-text">
+        <div class="scenario-tag tag-pink">👩 妈妈的专属时光</div>
+        <h3 class="scenario-title">安心聆听，<br>和宝宝一起进入梦乡</h3>
+        <p class="scenario-desc">每个夜晚，躺在床上，打开智能胎教助手，让温柔的故事声包裹着你们。AI 生成的每篇故事都经过优化，节奏舒缓，词汇温暖，专为睡前胎教设计。</p>
+        <ul class="scenario-feature-list">
+          <li>睡前专属故事模式，节奏轻柔缓慢</li>
+          <li>支持定时关闭，不打扰睡眠</li>
+          <li>每日智能推荐，内容不重复</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="scenario reverse fade-in">
+      <div class="scenario-visual sv-dad">
+        <span class="big-emoji">👨</span>
+        <div class="sub-emojis">🎙️ ❤️ 👶</div>
+        <div class="scenario-visual-label">爸爸的声音魔法</div>
+      </div>
+      <div class="scenario-text">
+        <div class="scenario-tag tag-lavender">👨 爸爸的声音魔法</div>
+        <h3 class="scenario-title">出差在外，<br>爱依然触手可及</h3>
+        <p class="scenario-desc">录制几分钟你的声音，AI 便能复刻出充满爱意的朗读。即使你在千里之外，宝宝也能每天听到爸爸的声音，感受到那份独特的陪伴。</p>
+        <ul class="scenario-feature-list">
+          <li>上传 3-5 分钟录音即可完成声音复刻</li>
+          <li>AI 保持音色特征，自然真实</li>
+          <li>妈妈随时可以为宝宝播放爸爸的声音</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="scenario fade-in">
+      <div class="scenario-visual sv-family">
+        <span class="big-emoji">👨‍👩‍👧</span>
+        <div class="sub-emojis">👴 👵 🎈</div>
+        <div class="scenario-visual-label">全家共同参与</div>
+      </div>
+      <div class="scenario-text">
+        <div class="scenario-tag tag-gold">👨‍👩‍👧 全家共同参与</div>
+        <h3 class="scenario-title">爷爷的故事，<br>外婆的童谣</h3>
+        <p class="scenario-desc">胎教不只是妈妈一个人的事。爷爷奶奶、外公外婆，每个家人都可以录制声音，用属于自己的方式与宝宝建立连接，让爱的传递跨越距离。</p>
+        <ul class="scenario-feature-list">
+          <li>支持多人声音复刻，家人各有专属</li>
+          <li>内容可自定义：故事、古诗、童谣都行</li>
+          <li>云端保存，全家人都能随时收听</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── STATS ─── -->
+<section id="stats">
+  <div class="stats-inner">
+    <div class="stat-item fade-in">
+      <span class="stat-number" data-target="10000">0</span>
+      <div class="stat-label">准妈妈正在使用</div>
+    </div>
+    <div class="stat-item fade-in fade-in-delay-1">
+      <span class="stat-number" data-target="50000">0</span>
+      <div class="stat-label">胎教内容已生成</div>
+    </div>
+    <div class="stat-item fade-in fade-in-delay-2">
+      <span class="stat-number" data-suffix="★" data-decimal="4.9">0</span>
+      <div class="stat-label">用户满意度</div>
+    </div>
+    <div class="stat-item fade-in fade-in-delay-3">
+      <span class="stat-number" data-target="10">0</span>
+      <div class="stat-label">精选胎教风格</div>
+    </div>
+  </div>
+</section>
+
+<!-- Wave divider -->
+<div class="wave-divider">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 60" fill="none">
+    <path d="M0,15 C360,45 720,0 1080,30 C1260,45 1380,15 1440,20 L1440,60 L0,60 Z" fill="#0A0E27"/>
+  </svg>
+</div>
+
+<!-- ─── PRICING ─── -->
+<section id="pricing">
+  <div class="section-inner">
+    <div style="text-align:center" class="fade-in">
+      <div class="section-label">价格方案</div>
+      <h2 class="section-title">选择适合你的方案</h2>
+      <p class="section-subtitle" style="margin:0 auto 60px">从免费开始，随时升级。没有任何隐藏费用。</p>
+    </div>
+    <div class="pricing-grid">
+      <!-- Free -->
+      <div class="pricing-card pc-free fade-in">
+        <div class="pricing-plan">免费版</div>
+        <div class="pricing-price"><span class="currency">¥</span>0<span class="period">/月</span></div>
+        <div class="pricing-note">永久免费，无需信用卡</div>
+        <div class="pricing-divider"></div>
+        <ul class="pricing-features">
+          <li><span class="check check-free">✓</span>每日 3 次内容生成</li>
+          <li><span class="check check-free">✓</span>5 种基础语音</li>
+          <li><span class="check check-free">✓</span>标准生成质量</li>
+          <li><span class="check check-free">✓</span>基础历史记录（7天）</li>
+        </ul>
+        <a href="/home" class="pricing-btn btn-free">开始使用</a>
+      </div>
+
+      <!-- Pro -->
+      <div class="pricing-card pc-pro fade-in fade-in-delay-1">
+        <div class="pricing-badge">🌟 推荐</div>
+        <div class="pricing-plan">专业版</div>
+        <div class="pricing-price"><span class="currency">¥</span>29<span class="period">/月</span></div>
+        <div class="pricing-note">解锁全部专业功能</div>
+        <div class="pricing-divider"></div>
+        <ul class="pricing-features">
+          <li><span class="check check-pro">✓</span>无限次内容生成</li>
+          <li><span class="check check-pro">✓</span>20+ 高质量语音</li>
+          <li><span class="check check-pro">✓</span>专属声音复刻功能</li>
+          <li><span class="check check-pro">✓</span>无限历史记录</li>
+          <li><span class="check check-pro">✓</span>优先客服支持</li>
+          <li><span class="check check-pro">✓</span>高质量 AI 生成模型</li>
+        </ul>
+        <a href="/home" class="pricing-btn btn-pro">立即升级</a>
+      </div>
+
+      <!-- Annual -->
+      <div class="pricing-card pc-annual fade-in fade-in-delay-2">
+        <div class="pricing-plan">年度版</div>
+        <div class="pricing-price" style="font-size:2.2rem"><span class="currency">¥</span>299<span class="period">/年</span></div>
+        <div class="pricing-note">
+          相当于 ¥25/月 &nbsp;
+          <span class="save-tag">✦ 省 ¥50</span>
+        </div>
+        <div class="pricing-divider"></div>
+        <ul class="pricing-features">
+          <li><span class="check check-annual">✓</span>包含所有专业版功能</li>
+          <li><span class="check check-annual">✓</span>买一年用十四个月</li>
+          <li><span class="check check-annual">✓</span>专属年度会员徽章</li>
+          <li><span class="check check-annual">✓</span>优先体验新功能</li>
+        </ul>
+        <a href="/home" class="pricing-btn btn-annual">选择年度版</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Wave divider -->
+<div class="wave-divider" style="transform:scaleY(-1)">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 60" fill="none">
+    <path d="M0,15 C360,45 720,0 1080,30 C1260,45 1380,15 1440,20 L1440,60 L0,60 Z" fill="#0D1235"/>
+  </svg>
+</div>
+
+<!-- ─── TESTIMONIALS ─── -->
+<section id="testimonials">
+  <div class="section-inner">
+    <div style="text-align:center" class="fade-in">
+      <div class="section-label">用户评价</div>
+      <h2 class="section-title">她们说的话，<br>最真实</h2>
+      <p class="section-subtitle" style="margin:0 auto 60px">来自真实用户的反馈，每一条都让我们深感鼓舞。</p>
+    </div>
+    <div class="testimonials-grid">
+      <div class="testimonial-card fade-in">
+        <div class="testimonial-stars">
+          <span class="star-icon">★</span><span class="star-icon">★</span>
+          <span class="star-icon">★</span><span class="star-icon">★</span><span class="star-icon">★</span>
+        </div>
+        <p class="testimonial-text">声音复刻功能太神了！用老公的声音给宝宝讲故事，每晚都睡得特别好。感觉他虽然出差在外，但从未离开过。</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar av-1">👩</div>
+          <div>
+            <div class="testimonial-name">张妈妈</div>
+            <div class="testimonial-info">孕 32 周 · 北京</div>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial-card fade-in fade-in-delay-1">
+        <div class="testimonial-stars">
+          <span class="star-icon">★</span><span class="star-icon">★</span>
+          <span class="star-icon">★</span><span class="star-icon">★</span><span class="star-icon">★</span>
+        </div>
+        <p class="testimonial-text">坚持用了整个孕期，宝宝出生后对这些熟悉的声音反应特别明显，眼神会追着声源转。真的觉得胎教有效果！</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar av-2">👩‍🍼</div>
+          <div>
+            <div class="testimonial-name">李女士</div>
+            <div class="testimonial-info">宝宝已出生 3 个月 · 上海</div>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial-card fade-in fade-in-delay-2">
+        <div class="testimonial-stars">
+          <span class="star-icon">★</span><span class="star-icon">★</span>
+          <span class="star-icon">★</span><span class="star-icon">★</span><span class="star-icon">★</span>
+        </div>
+        <p class="testimonial-text">在外地出差也能每天给宝宝讲故事，这个功能让我不再觉得愧疚。老婆说宝宝每次听到我的声音就会动，太感动了。</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar av-3">👨</div>
+          <div>
+            <div class="testimonial-name">王先生</div>
+            <div class="testimonial-info">准爸爸 · 深圳</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FAQ ─── -->
+<section id="faq">
+  <div class="section-inner">
+    <div style="text-align:center" class="fade-in">
+      <div class="section-label">常见问题</div>
+      <h2 class="section-title">你可能想知道的</h2>
+      <p class="section-subtitle" style="margin:0 auto 60px">还有疑问？随时联系我们。</p>
+    </div>
+    <div class="faq-list">
+      <div class="faq-item fade-in">
+        <div class="faq-question" onclick="toggleFaq(this)">
+          声音复刻需要录制多长时间？
+          <span class="faq-icon">+</span>
+        </div>
+        <div class="faq-answer">
+          <div class="faq-answer-inner">只需上传 3-5 分钟的清晰录音即可。建议在安静环境下录制，用正常说话的方式朗读一段文字。AI 会自动学习你的音色特征，通常 10 分钟内即可完成声音复刻。</div>
+        </div>
+      </div>
+      <div class="faq-item fade-in fade-in-delay-1">
+        <div class="faq-question" onclick="toggleFaq(this)">
+          生成的胎教内容安全吗？
+          <span class="faq-icon">+</span>
+        </div>
+        <div class="faq-answer">
+          <div class="faq-answer-inner">完全安全。所有生成内容都经过专业内容审核系统过滤，确保语言温暖、积极、适合孕期聆听。AI 生成的故事和诗歌经过专门训练，避免任何可能造成负面情绪的内容。</div>
+        </div>
+      </div>
+      <div class="faq-item fade-in fade-in-delay-2">
+        <div class="faq-question" onclick="toggleFaq(this)">
+          可以在多个设备上使用吗？
+          <span class="faq-icon">+</span>
+        </div>
+        <div class="faq-answer">
+          <div class="faq-answer-inner">支持手机、平板、电脑全平台同步使用。登录同一账号后，历史记录、声音复刻和所有内容都会自动同步，随时随地都能陪伴宝宝。</div>
+        </div>
+      </div>
+      <div class="faq-item fade-in fade-in-delay-3">
+        <div class="faq-question" onclick="toggleFaq(this)">
+          专业版可以退款吗？
+          <span class="faq-icon">+</span>
+        </div>
+        <div class="faq-answer">
+          <div class="faq-answer-inner">可以。购买专业版后 7 天内，如果你对服务不满意，可以申请全额退款，无需任何理由。我们对自己的产品充满信心，也尊重每一位用户的选择。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── CTA BANNER ─── -->
+<section id="cta-banner">
+  <div class="cta-banner-inner fade-in">
+    <span class="cta-star">✦</span>
+    <span class="cta-moon">🌙</span>
+    <h2 class="cta-banner-title">现在就开始<br>给宝宝最美好的开始</h2>
+    <p class="cta-banner-sub">免费注册，即刻体验。宝宝在等你们的声音。</p>
+    <div class="cta-banner-btns">
+      <a href="/home" class="btn-primary" style="font-size:1.05rem; padding:18px 40px">
+        🎵 立即免费试用
+      </a>
+      <a href="#pricing" class="btn-secondary" style="font-size:1.05rem; padding:18px 40px">
+        查看专业版 →
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FOOTER ─── -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <a href="#" class="footer-logo">🌙 智能胎教助手</a>
+      <p class="footer-desc">用 AI 的力量，让每一位家庭成员都能参与到宝宝的成长中。温柔、专业、可信赖的胎教伙伴。</p>
+      <div class="footer-contact">
+        📮 联系我们：<a href="mailto:support@kevinai.com">support@kevinai.com</a>
+      </div>
+    </div>
+    <div>
+      <div class="footer-col-title">产品</div>
+      <ul class="footer-links">
+        <li><a href="/home">主应用入口</a></li>
+        <li><a href="#features">核心功能</a></li>
+        <li><a href="#pricing">价格方案</a></li>
+        <li><a href="#faq">常见问题</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="footer-col-title">法律</div>
+      <ul class="footer-links">
+        <li><a href="#">隐私政策</a></li>
+        <li><a href="#">使用条款</a></li>
+        <li><a href="#">Cookie 政策</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="footer-copy">© 2025 智能胎教助手. 保留所有权利。用 ❤️ 为每一个家庭打造。</div>
+    <div class="footer-bottom-links">
+      <a href="/home">进入应用</a>
+      <a href="mailto:support@kevinai.com">联系我们</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // ─── STARS ───
+  (function() {
+    const container = document.getElementById('starsContainer');
+    const count = window.innerWidth < 600 ? 60 : 120;
+    for (let i = 0; i < count; i++) {
+      const s = document.createElement('div');
+      s.className = 'star';
+      const size = Math.random() * 2.5 + 0.5;
+      s.style.cssText = `
+        width:${size}px; height:${size}px;
+        top:${Math.random()*100}%;
+        left:${Math.random()*100}%;
+        --dur:${2+Math.random()*4}s;
+        --delay:${Math.random()*5}s;
+        --min-op:${0.05+Math.random()*0.1};
+        --max-op:${0.5+Math.random()*0.5};
+      `;
+      container.appendChild(s);
+    }
+  })();
+
+  // ─── SCROLL ANIMATIONS ───
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('visible'); }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+  // ─── COUNTER ANIMATION ───
+  const counterObs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      const el = e.target;
+      counterObs.unobserve(el);
+      if (el.dataset.decimal) {
+        const target = parseFloat(el.dataset.decimal);
+        const suffix = el.dataset.suffix || '';
+        let start = 0; const duration = 1800;
+        const startTime = performance.now();
+        function tick(now) {
+          const p = Math.min((now - startTime) / duration, 1);
+          const eased = 1 - Math.pow(1-p, 3);
+          el.textContent = (eased * target).toFixed(1) + suffix;
+          if (p < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      } else if (el.dataset.target) {
+        const target = parseInt(el.dataset.target);
+        const suffix = el.dataset.suffix || '+';
+        let start = 0; const duration = 1800;
+        const startTime = performance.now();
+        function tick(now) {
+          const p = Math.min((now - startTime) / duration, 1);
+          const eased = 1 - Math.pow(1-p, 3);
+          const val = Math.round(eased * target);
+          el.textContent = val >= 1000
+            ? (val >= 10000 ? Math.round(val/10000)+'万' : Math.round(val/1000)+'千')
+            : val;
+          if (p < 1) requestAnimationFrame(tick);
+          else el.textContent = (target >= 10000 ? target/10000+'万' : target >= 1000 ? target/1000+'千' : target) + suffix;
+        }
+        requestAnimationFrame(tick);
+      }
+    });
+  }, { threshold: 0.5 });
+  document.querySelectorAll('.stat-number').forEach(el => counterObs.observe(el));
+
+  // ─── FAQ ───
+  function toggleFaq(question) {
+    const item = question.parentElement;
+    const wasOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+    if (!wasOpen) item.classList.add('open');
+  }
+
+  // ─── HAMBURGER ───
+  function toggleMenu() {
+    const links = document.getElementById('navLinks');
+    links.classList.toggle('open');
+  }
+  document.addEventListener('click', e => {
+    const nav = document.getElementById('navbar');
+    if (!nav.contains(e.target)) {
+      document.getElementById('navLinks').classList.remove('open');
+    }
+  });
+
+  // ─── NAV SCROLL EFFECT ───
+  window.addEventListener('scroll', () => {
+    const nav = document.getElementById('navbar');
+    if (window.scrollY > 20) {
+      nav.style.background = 'rgba(10,14,39,0.92)';
+    } else {
+      nav.style.background = 'rgba(10,14,39,0.75)';
+    }
+  }, { passive: true });
+</script>
+</body>
+</html>
