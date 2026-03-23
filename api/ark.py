@@ -192,7 +192,7 @@ class handler(BaseHTTPRequestHandler):
                     "message": "Success" if not is_dry_run_mode else "Dry run completed successfully",
                     "choices": [{
                         "message": {
-                            "content": "这是一个测试胎教故事。从前有一只小兔子，它喜欢在月光下跳舞..."
+                            "content": "这是一个测试早教故事。小熊宝宝今天学会了一个新本领——认识颜色！红红的苹果、黄黄的香蕉、绿绿的树叶..."
                         }
                     }],
                     "cost": 0.0,
@@ -221,7 +221,7 @@ class handler(BaseHTTPRequestHandler):
             ark_payload = {
                 "model": model,
                 "messages": [
-                    {"role": "system", "content": "你是一个专业的胎教内容创作助手，擅长生成温馨、积极、有益的胎教内容。"},
+                    {"role": "system", "content": "你是一个专业的婴幼儿早教内容创作助手，擅长为0-36个月宝宝生成适龄、温馨、有趣的早教内容，包括睡前故事、儿歌童谣、认知启蒙、语言发展、感官探索和亲子互动游戏。"},
                     {"role": "user", "content": prompt}
                 ],
                 "max_tokens": 5000,
