@@ -136,7 +136,7 @@ export interface HomeController {
   voiceOptions: typeof VOICE_OPTIONS;
 }
 
-const MODEL_DEFAULT = 'doubao-1.5-pro-32k-250115';
+const MODEL_DEFAULT = 'doubao-seed-1-8-251228';
 const HISTORY_KEY = 've_story_history';
 
 function loadHistory(): StoryMeta[] {

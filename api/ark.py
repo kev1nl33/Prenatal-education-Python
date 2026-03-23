@@ -157,7 +157,7 @@ class handler(BaseHTTPRequestHandler):
             
             # 提取参数 - 所有配置从环境变量读取，不再依赖前端传递
             prompt = data.get("prompt", "").strip()
-            model = os.environ.get('ARK_MODEL', 'doubao-seed-1-6-flash-250715')  # 模型从环境变量读取
+            model = os.environ.get('ARK_MODEL', 'doubao-seed-1-8-251228')  # 模型从环境变量读取
             dry_run_param = data.get("dry_run", False)
             
             # 检查是否为干跑模式
