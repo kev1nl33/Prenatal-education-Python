@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     const arkApiKey = process.env.ARK_API_KEY;
-    const model = process.env.ARK_MODEL || 'doubao-seed-1-6-flash-250715';
+    const model = process.env.ARK_MODEL || 'doubao-seed-1-8-251228';
 
     // 无 API key 时返回 mock
     if (!arkApiKey || arkApiKey === 'your_ark_api_key_here') {
